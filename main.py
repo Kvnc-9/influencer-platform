@@ -35,7 +35,7 @@ if 'logged_in' not in st.session_state:
 def trigger_analysis(username):
     """Make.com Webhook'unu tetikler"""
     # BURAYA MAKE.COM'DAN ALDIĞIN URL'Yİ YAPIŞTIR:
-    webhook_url = "https://hook.eu2.make.com/SENIN_UZUN_KODUN_BURAYA_GELECEK" 
+    webhook_url = "https://hook.eu1.make.com/ixxd5cuuqkhhkpd8sqn5soiyol0a952x?username=testkullanicisi"
     
     try:
         # Webhook'a username verisini gönderiyoruz
