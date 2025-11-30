@@ -3,17 +3,21 @@ from supabase import create_client
 import pandas as pd
 import plotly.express as px
 import time
+import requests  # YENİ EKLENDİ
 
 # -----------------------------------------------------------------------------
-# 1. AYARLAR VE GÜVENLİK
+# 1. AYARLAR
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Influencer Insights Platform", layout="wide", page_icon="🚀")
 
+# GÜVENLİK AYARLARI
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+    # Webhook URL'sini buraya Secrets'tan da çekebilirsin veya aşağıya elle yazabilirsin.
+    # Güvenlik için doğrusu Secrets'tır ama test için aşağıda elle yazacağız.
 except:
-    st.error("⚠️ Sunucu ayarları eksik! Secrets ayarlarını kontrol edin.")
+    st.error("⚠️ Secrets ayarları eksik!")
     st.stop()
 
 @st.cache_resource
@@ -26,8 +30,20 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # -----------------------------------------------------------------------------
-# 2. HESAPLAMA MOTORU
+# 2. FONKSİYONLAR
 # -----------------------------------------------------------------------------
+def trigger_analysis(username):
+    """Make.com Webhook'unu tetikler"""
+    # BURAYA MAKE.COM'DAN ALDIĞIN URL'Yİ YAPIŞTIR:
+    webhook_url = "https://hook.eu2.make.com/SENIN_UZUN_KODUN_BURAYA_GELECEK" 
+    
+    try:
+        # Webhook'a username verisini gönderiyoruz
+        requests.get(f"{webhook_url}?username={username}")
+        return True
+    except Exception as e:
+        return False
+
 def parse_ai_data(raw_text):
     data = {"Niche": "Genel", "Score": 5, "Brands": "-"}
     if not raw_text: return data
@@ -47,68 +63,81 @@ def calculate_metrics(row):
     return pd.Series([est_budget, f"{roi:.1f}x"], index=['Tahmini Bütçe ($)', 'ROI Tahmini'])
 
 # -----------------------------------------------------------------------------
-# 3. WEB SİTESİ ARAYÜZÜ (GÜNCELLENMİŞ GİRİŞ)
+# 3. ARAYÜZ
 # -----------------------------------------------------------------------------
 
-# --- SADECE GİRİŞ EKRANI (Kayıt Ol Yok) ---
+# --- GİRİŞ EKRANI ---
 if not st.session_state['logged_in']:
-    
-    # Ortaya Hizalamak için Kolonlar
     col1, col2, col3 = st.columns([1, 1.5, 1])
-    
     with col2:
-        st.markdown("<br><br>", unsafe_allow_html=True) # Biraz boşluk
-        st.markdown("<h1 style='text-align: center;'>🔒 Özel Müşteri Girişi</h1>", unsafe_allow_html=True)
-        st.info("Bu platforma sadece tanımlanmış üyeler erişebilir.")
-        
-        # Form Alanı
-        with st.form("login_form"):
-            email = st.text_input("Kullanıcı Adı (E-Posta)")
-            password = st.text_input("Giriş Anahtarı (Şifre)", type="password")
-            submit_button = st.form_submit_button("Giriş Yap", use_container_width=True)
-            
-            if submit_button:
+        st.markdown("<br><br><h1 style='text-align: center;'>🔒 Özel Giriş</h1>", unsafe_allow_html=True)
+        with st.form("login"):
+            email = st.text_input("Kullanıcı Adı")
+            password = st.text_input("Şifre", type="password")
+            if st.form_submit_button("Giriş Yap", use_container_width=True):
                 try:
-                    user = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    supabase.auth.sign_in_with_password({"email": email, "password": password})
                     st.session_state['logged_in'] = True
-                    st.success("Giriş Onaylandı! Yönlendiriliyorsunuz...")
-                    time.sleep(1)
                     st.rerun()
-                except Exception as e:
-                    st.error("❌ Erişim Reddedildi: Kullanıcı adı veya şifre hatalı.")
+                except:
+                    st.error("Hatalı Giriş")
 
-# --- DASHBOARD (Giriş Başarılıysa) ---
+# --- DASHBOARD ---
 else:
+    # YAN MENÜ (YENİ ANALİZ EKLEME YERİ)
     with st.sidebar:
-        st.title("⚙️ Panel")
-        if st.button("Güvenli Çıkış"):
+        st.title("⚙️ Kontrol Paneli")
+        
+        st.markdown("### 🕵️ Yeni Analiz Ekle")
+        with st.form("new_analysis"):
+            new_user = st.text_input("Instagram Kullanıcı Adı", placeholder="Örn: acunilicali")
+            btn_analyze = st.form_submit_button("Analizi Başlat 🚀")
+            
+            if btn_analyze and new_user:
+                with st.spinner("Make.com tetikleniyor..."):
+                    success = trigger_analysis(new_user)
+                    if success:
+                        st.success("Analiz talebi gönderildi! 1-2 dakika içinde listeye düşecek.")
+                        time.sleep(2) # Mesajı okusun diye bekle
+                        st.rerun()
+                    else:
+                        st.error("Bağlantı hatası oluştu.")
+        
+        st.markdown("---")
+        if st.button("Çıkış Yap"):
             st.session_state['logged_in'] = False
             st.rerun()
             
+    # ANA EKRAN
     st.title("🚀 Influencer Analiz Paneli")
     
-    # Veri Çekme ve Gösterme Kısmı (Aynı Kalıyor)
     response = supabase.table('influencers').select("*").execute()
     
     if response.data:
         df = pd.DataFrame(response.data)
+        
+        # Veri İşleme
         ai_data = df['ai_analysis_raw'].apply(parse_ai_data).apply(pd.Series)
         df = pd.concat([df, ai_data], axis=1)
         metrics = df.apply(calculate_metrics, axis=1)
         df = pd.concat([df, metrics], axis=1)
         
-        # Filtreler ve Grafikler
+        # Filtreler
         niche = st.sidebar.multiselect("Kategori", df['Niche'].unique())
         if niche: df = df[df['Niche'].isin(niche)]
         
+        # Kartlar
         k1, k2, k3 = st.columns(3)
-        k1.metric("Toplam Influencer", len(df))
-        k2.metric("Ortalama Puan", f"{df['Score'].mean():.1f}")
-        k3.metric("Kitle", f"{df['follower_count'].sum():,}")
+        k1.metric("Analiz Edilen Profil", len(df))
+        k2.metric("Ortalama Skor", f"{df['Score'].mean():.1f}")
+        k3.metric("Toplam Erişim", f"{df['follower_count'].sum():,}")
         
-        st.dataframe(df[['username', 'Niche', 'Score', 'Brands', 'Tahmini Bütçe ($)', 'ROI Tahmini']], use_container_width=True)
+        # Tablo
+        st.dataframe(df[['username', 'Niche', 'Score', 'Tahmini Bütçe ($)', 'ROI Tahmini']], use_container_width=True)
         
-        fig = px.scatter(df, x="Tahmini Bütçe ($)", y="Score", color="Niche", size="follower_count", hover_name="username", title="Bütçe Analizi")
+        # Grafik
+        fig = px.scatter(df, x="Tahmini Bütçe ($)", y="Score", color="Niche", size="follower_count", hover_name="username")
         st.plotly_chart(fig, use_container_width=True)
+        
     else:
-        st.warning("Veri bulunamadı.")
+        st.info("Henüz veri yok. Sol taraftan yeni bir kullanıcı ekleyin!")
