@@ -2,13 +2,32 @@ import streamlit as st
 from supabase import create_client
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import time
 import requests
+import json
+import numpy as np
 
 # -----------------------------------------------------------------------------
-# 1. AYARLAR
+# 1. AYARLAR VE GÜVENLİK
 # -----------------------------------------------------------------------------
-st.set_page_config(page_title="Influencer Insights Platform", layout="wide", page_icon="🚀")
+st.set_page_config(page_title="Influencer CPM/RPM Analiz", layout="wide", page_icon="📊")
+
+# CSS: Kartlar ve Renkler
+st.markdown("""
+<style>
+    .metric-card {
+        background-color: #ffffff;
+        border: 1px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .big-font { font-size: 24px !important; font-weight: bold; color: #333; }
+    .small-font { font-size: 14px !important; color: #666; }
+</style>
+""", unsafe_allow_html=True)
 
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -27,59 +46,139 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # -----------------------------------------------------------------------------
-# 2. HESAPLAMA MOTORU
+# 2. ANALİZ MOTORU (CPM, RPM, VIDEO)
 # -----------------------------------------------------------------------------
-def trigger_analysis(username):
+
+def trigger_webhook(username):
     # SONUNDA ?username= OLMADAN TEMİZ LINK:
-    webhook_url = "https://hook.eu1.make.com/ixxd5cuuqkhhkpd8sqn5soiyol0a952x" 
+    webhook_url = "https://hook.eu2.make.com/BURAYA_SENIN_MAKE_LINKIN" 
     try:
         requests.get(f"{webhook_url}?username={username}")
         return True
     except:
         return False
 
-def parse_ai_data(raw_text):
-    data = {"Niche": "Genel", "Score": 5, "Brands": "-"}
-    if not raw_text: return data
-    for line in raw_text.split('\n'):
-        if "Niche:" in line: data["Niche"] = line.split("Niche:")[1].strip()
-        elif "Score:" in line: 
-            try: 
-                # Sadece rakamları çek
-                score_str = ''.join(filter(str.isdigit, line.split("Score:")[1]))
-                data["Score"] = int(score_str) if score_str else 5
-            except: data["Score"] = 5
-        elif "Brands:" in line: data["Brands"] = line.split("Brands:")[1].strip()
-    return data
+def analyze_posts_json(row):
+    """
+    JSON paketini açar, video izlenmelerini ve yorumları analiz eder.
+    """
+    raw_data = row.get('posts_raw_data')
+    
+    # Varsayılan Değerler
+    stats = {
+        "avg_views": 0,
+        "total_likes": 0,
+        "comment_quality": "Düşük Etkileşim ⚠️",
+        "top_comment_likes": 0,
+        "video_count": 0
+    }
+    
+    if not raw_data:
+        return pd.Series(stats)
+    
+    # JSON verisi bazen string gelir, bazen liste. Kontrol edelim.
+    if isinstance(raw_data, str):
+        try:
+            posts = json.loads(raw_data)
+        except:
+            return pd.Series(stats)
+    else:
+        posts = raw_data
 
-def calculate_metrics(row):
-    # 1. Takipçi Sayısını Al (Garanti Sayı)
-    followers = row['follower_count']
+    # --- ANALİZ DÖNGÜSÜ ---
+    views_list = []
+    max_comment_likes = 0
+    total_likes = 0
     
-    # 2. Skoru Al (Garanti Sayı)
-    score = row['Score']
-    
-    # Eğer takipçi 0 ise hesaplama yapma
-    if followers <= 0:
-        return pd.Series([0, "Veri Bekleniyor"], index=['Tahmini Bütçe ($)', 'ROI Tahmini'])
+    if isinstance(posts, list):
+        for post in posts:
+            # 1. Video İzlenmesi (Sadece video/reel ise)
+            # Apify genelde 'videoViewCount' veya 'playCount' verir
+            views = post.get('videoViewCount') or post.get('playCount') or 0
+            if views > 0:
+                views_list.append(views)
+            
+            # 2. Toplam Beğeni
+            total_likes += post.get('likesCount', 0)
 
-    # 3. HESAPLAMA (MATEMATİK BURADA)
-    # Bütçe Formülü: (Takipçi / 1000) * 10$ * (1 + Puan/10)
-    est_budget = (followers / 1000) * 10 * (1 + (score / 10))
+            # 3. Yorum Analizi (En çok beğenilen yorumu bul)
+            # Apify 'previewComments' veya 'latestComments' içinde liste verir
+            comments = post.get('previewComments', []) or post.get('latestComments', [])
+            if comments and isinstance(comments, list):
+                for c in comments:
+                    c_likes = c.get('likesCount', 0)
+                    if c_likes > max_comment_likes:
+                        max_comment_likes = c_likes
+
+    # --- SONUÇLARI HESAPLA ---
+    if views_list:
+        stats["avg_views"] = int(sum(views_list) / len(views_list))
+        stats["video_count"] = len(views_list)
     
-    # ROI Formülü: (Puan * 0.4) + 1
-    roi_val = (score * 0.4) + 1.0
+    stats["total_likes"] = total_likes
+    stats["top_comment_likes"] = max_comment_likes
     
-    return pd.Series([est_budget, f"{roi_val:.1f}x"], index=['Tahmini Bütçe ($)', 'ROI Tahmini'])
+    # Yorum Kalite Kontrolü (>100 Beğeni)
+    if max_comment_likes >= 100:
+        stats["comment_quality"] = "🔥 Yüksek Etkileşim (Topluluk Güçlü)"
+    elif max_comment_likes > 20:
+        stats["comment_quality"] = "✅ Orta Seviye"
+    else:
+        stats["comment_quality"] = "⚠️ Düşük (Yorumlar Beğenilmiyor)"
+        
+    return pd.Series(stats)
+
+def calculate_financials(row):
+    """
+    CPM ve RPM Hesaplama
+    """
+    # Verileri al
+    views = row.get('avg_views', 0)
+    score = row.get('Score', 5)
+    
+    # Eğer izlenme verisi yoksa (Video atmıyorsa) takipçiden yola çık (Fallback)
+    if views == 0:
+        impressions = row.get('follower_count', 0) * 0.10 # Takipçinin %10'u görür tahmini
+    else:
+        impressions = views # Gerçek izlenme = Impression
+
+    if impressions == 0: impressions = 1000 # Bölme hatası olmasın diye
+
+    # --- 1. MALİYET (AD COST) HESABI ---
+    # Formül: Pazar ortalaması 1000 izlenme başına 5$ - 15$ arasıdır.
+    # Kalite puanı yüksekse Influencer daha pahalıdır.
+    base_cost_per_view = 0.008 # İzlenme başına 0.008$ (8$ CPM tabanı)
+    cost_multiplier = 1 + (score / 20) # Puan 10 ise 1.5x çarpan
+    
+    estimated_ad_cost = impressions * base_cost_per_view * cost_multiplier
+
+    # --- 2. CPM (Cost Per Mille) ---
+    # Formül: (Cost / Impressions) * 1000
+    cpm = (estimated_ad_cost / impressions) * 1000
+    
+    # --- 3. REVENUE (GELİR) TAHMİNİ ---
+    # Bu reklamdan ne kadar kazanırız? 
+    # ROI Faktörü: Puan * Etkileşim
+    # Formül: Yatırılan para x (1.5 ile 5.0 arası getiri)
+    roi_factor = (score * 0.3) + 1.2 
+    estimated_revenue = estimated_ad_cost * roi_factor
+    
+    # --- 4. RPM (Revenue Per Mille) ---
+    # Formül: (Total Revenue / Impressions) * 1000
+    rpm = (estimated_revenue / impressions) * 1000
+
+    return pd.Series([estimated_ad_cost, estimated_revenue, cpm, rpm], 
+                     index=['Ad_Cost', 'Est_Revenue', 'CPM ($)', 'RPM ($)'])
 
 # -----------------------------------------------------------------------------
 # 3. ARAYÜZ
 # -----------------------------------------------------------------------------
 
+# --- GİRİŞ EKRANI ---
 if not st.session_state['logged_in']:
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
-        st.markdown("<br><h1 style='text-align: center;'>🔒 Giriş Paneli</h1>", unsafe_allow_html=True)
+        st.markdown("<br><br><h1 style='text-align: center;'>🔒 Video Analiz Giriş</h1>", unsafe_allow_html=True)
         with st.form("login"):
             email = st.text_input("Kullanıcı Adı")
             password = st.text_input("Şifre", type="password")
@@ -89,88 +188,110 @@ if not st.session_state['logged_in']:
                     st.session_state['logged_in'] = True
                     st.rerun()
                 except:
-                    st.error("Giriş Başarısız")
+                    st.error("Hatalı Giriş")
 
+# --- DASHBOARD ---
 else:
     with st.sidebar:
-        st.title("⚙️ İşlemler")
-        with st.form("new_analysis"):
-            st.write("Yeni Analiz Başlat")
-            new_user = st.text_input("Instagram Kullanıcı Adı", placeholder="Örn: hadise")
-            if st.form_submit_button("Analiz Et 🚀"):
-                if new_user:
-                    with st.spinner("İstek gönderiliyor..."):
-                        if trigger_analysis(new_user):
-                            st.success("Başarılı! Lütfen bekleyin...")
-                        else:
-                            st.error("Hata.")
-        st.markdown("---")
+        st.title("⚙️ Kontrol")
         if st.button("Çıkış Yap"):
             st.session_state['logged_in'] = False
             st.rerun()
-            
-    st.title("🚀 Influencer Analiz Paneli")
+
+    st.title("📊 Influencer Video & CPM Analizi")
     
     response = supabase.table('influencers').select("*").execute()
     
     if response.data:
         df = pd.DataFrame(response.data)
+        
+        # --- VERİ İŞLEME ---
+        # 1. AI Puanını Ayrıştır
+        def parse_ai_score(text):
+            try: return int(''.join(filter(str.isdigit, str(text).split("Score:")[1])))
+            except: return 5
+        df['Score'] = df['ai_analysis_raw'].apply(parse_ai_score)
+        
+        # 2. JSON Analizi (Video İzlenmeleri & Yorumlar)
+        video_stats = df.apply(analyze_posts_json, axis=1)
+        df = pd.concat([df, video_stats], axis=1)
+        
+        # 3. Finansal Hesaplama (CPM / RPM)
+        financials = df.apply(calculate_financials, axis=1)
+        df = pd.concat([df, financials], axis=1)
+        
+        # --- SEKMELER ---
+        tab1, tab2, tab3 = st.tabs(["🎥 Video Performans & CPM", "⚔️ Karşılaştırma", "🕵️ Yeni Analiz"])
+        
+        # TAB 1: DETAYLI VIDEO ANALİZİ
+        with tab1:
+            st.subheader("Profil Detayları")
+            selected_user = st.selectbox("İncelenecek Influencer:", df['username'].unique())
+            
+            p = df[df['username'] == selected_user].iloc[0]
+            
+            # ÜST KARTLAR (KPI)
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("Ortalama Video İzlenme", f"{p['avg_views']:,.0f}")
+            c2.metric("Tahmini Maliyet (Post Başı)", f"${p['Ad_Cost']:,.0f}")
+            c3.metric("CPM (1000 Gösterim Maliyeti)", f"${p['CPM ($)']:.2f}")
+            c4.metric("RPM (1000 Gösterim Geliri)", f"${p['RPM ($)']:.2f}", delta=f"{((p['RPM ($)']/p['CPM ($)'])-1)*100:.0f}% Kâr")
+            
+            st.divider()
+            
+            # YORUM VE ETKİLEŞİM KALİTESİ
+            col_left, col_right = st.columns([1, 2])
+            
+            with col_left:
+                st.markdown("### 💬 Topluluk Kalitesi")
+                st.info(f"Yorum Durumu: **{p['comment_quality']}**")
+                st.write(f"En çok beğenilen yorum **{p['top_comment_likes']}** beğeni aldı.")
+                
+                if p['top_comment_likes'] > 100:
+                    st.success("MÜKEMMEL: Takipçiler yorumları okuyor ve beğeniyor. Topluluk canlı.")
+                else:
+                    st.warning("ZAYIF: Takipçiler yorumlarla pek ilgilenmiyor.")
+                    
+            with col_right:
+                st.markdown("### 📈 CPM vs RPM Dengesi")
+                # Bar Chart: Maliyet vs Gelir
+                chart_data = pd.DataFrame({
+                    'Metrik': ['Maliyet (CPM)', 'Gelir (RPM)'],
+                    'Değer ($)': [p['CPM ($)'], p['RPM ($)']]
+                })
+                fig = px.bar(chart_data, x='Metrik', y='Değer ($)', color='Metrik', text_auto='.2f')
+                st.plotly_chart(fig, use_container_width=True)
 
-        # --- 🛠️ DÜZELTME BÖLÜMÜ (ÖNEMLİ) ---
-        
-        # 1. Takipçi sayısını sayıya zorla çevir (Hata varsa 0 yap)
-        df['follower_count'] = pd.to_numeric(df['follower_count'], errors='coerce').fillna(0)
-        
-        # 2. AI verisi yoksa boş string yap
-        df['ai_analysis_raw'] = df['ai_analysis_raw'].fillna("")
-        
-        # 3. AI verisini parçala
-        ai_data = df['ai_analysis_raw'].apply(parse_ai_data).apply(pd.Series)
-        df = pd.concat([df, ai_data], axis=1)
-        
-        # 4. Skoru sayıya zorla çevir
-        df['Score'] = pd.to_numeric(df['Score'], errors='coerce').fillna(5)
-        
-        # 5. Hesaplamaları Şimdi Yap (Veriler temizlendiği için çalışacak)
-        metrics = df.apply(calculate_metrics, axis=1)
-        df = pd.concat([df, metrics], axis=1)
-        
-        # --- 🛠️ BİTİŞ ---
-
-        # KPI Kartları
-        k1, k2, k3 = st.columns(3)
-        k1.metric("Toplam Profil", len(df))
-        k2.metric("Ortalama Skor", f"{df['Score'].mean():.1f}")
-        k3.metric("Toplam Erişim", f"{df['follower_count'].sum():,.0f}")
-        
-        # Tablo
-        st.subheader("📋 Detaylı Liste")
-        st.dataframe(
-            df[['username', 'Niche', 'Score', 'Tahmini Bütçe ($)', 'ROI Tahmini']], 
-            use_container_width=True
-        )
-        
-        # Grafik (Sadece verisi olanları çiz)
-        df_clean = df[df['follower_count'] > 0] # Sadece takipçisi 0'dan büyük olanlar
-        
-        if not df_clean.empty:
-            fig = px.scatter(
-                df_clean, 
-                x="Tahmini Bütçe ($)", 
-                y="Score", 
-                color="Niche", 
-                size="follower_count", 
+        # TAB 2: KARŞILAŞTIRMA
+        with tab2:
+            st.subheader("Hangi Influencer Daha Kârlı?")
+            
+            # Scatter Plot: X=İzlenme, Y=RPM
+            fig_comp = px.scatter(
+                df, 
+                x="avg_views", 
+                y="RPM ($)", 
+                size="Ad_Cost", 
+                color="Score",
                 hover_name="username",
-                title="Bütçe vs Kalite"
+                title="İzlenme vs Gelir Potansiyeli (Balon Boyutu = Maliyet)",
+                labels={"avg_views": "Ortalama İzlenme", "RPM ($)": "RPM (Gelir)"}
             )
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("Grafik için yeterli veri yok.")
+            st.plotly_chart(fig_comp, use_container_width=True)
+            
+            st.dataframe(
+                df[['username', 'avg_views', 'CPM ($)', 'RPM ($)', 'comment_quality']], 
+                use_container_width=True
+            )
 
-        # --- DEBUG ALANI (HATAYI GÖRMEK İÇİN) ---
-        with st.expander("🛠️ Geliştirici Veri Kontrolü (Hata Varsa Buraya Bak)"):
-            st.write("Supabase'den gelen ham veri:")
-            st.write(df.head())
-        
+        # TAB 3: YENİ ANALİZ
+        with tab3:
+            st.subheader("Yeni Veri Çek")
+            new_u = st.text_input("Kullanıcı Adı:")
+            if st.button("Make.com'u Tetikle 🚀"):
+                if new_u:
+                    trigger_webhook(new_u)
+                    st.success("Talep gönderildi. 1-2 dakika içinde 'Video Performans' sekmesine düşecek.")
+
     else:
         st.info("Veri yok.")
