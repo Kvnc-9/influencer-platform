@@ -7,9 +7,16 @@ import requests
 import json
 
 # -----------------------------------------------------------------------------
-# 1. AYARLAR
+# 1. AYARLAR VE GÜVENLİK
 # -----------------------------------------------------------------------------
-st.set_page_config(page_title="CPM Analiz", layout="wide", page_icon="📉")
+st.set_page_config(page_title="CPM/RPM Calculator", layout="wide", page_icon="🧮")
+
+st.markdown("""
+<style>
+    .big-font { font-size: 16px !important; }
+    div[data-testid="stMetricValue"] { font-size: 24px; }
+</style>
+""", unsafe_allow_html=True)
 
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -28,7 +35,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # -----------------------------------------------------------------------------
-# 2. VERİ MOTORU
+# 2. VERİ MOTORU (JSON TAMİR EDİCİ EKLENDİ)
 # -----------------------------------------------------------------------------
 
 def trigger_webhook(username):
@@ -39,38 +46,52 @@ def trigger_webhook(username):
     except:
         return False
 
-def get_avg_views_from_json(row):
-    """JSON paketini açar ve ortalama izlenmeyi bulur"""
-    raw_data = row.get('posts_raw_data')
+def safe_json_parse(raw_data):
+    """
+    🛠️ ÖZEL TAMİR FONKSİYONU
+    Gelen veri {..}, {..} şeklindeyse bunu [{..}, {..}] şekline çevirir.
+    """
+    if not raw_data: return []
     
-    # Veri yoksa 0 dön
-    if not raw_data: return 0
+    # Zaten listeyse direkt döndür
+    if isinstance(raw_data, list): return raw_data
     
+    # String değilse boş dön
+    if not isinstance(raw_data, str): return []
+
     try:
-        # Supabase bazen string, bazen direkt list verir. İkisini de dene.
-        if isinstance(raw_data, str):
-            posts = json.loads(raw_data)
-        else:
-            posts = raw_data
-            
-        views_list = []
-        if isinstance(posts, list):
-            for post in posts:
-                # Video izlenmesi (Farklı isimlerle gelebilir, hepsini dene)
-                views = post.get('videoViewCount') or post.get('playCount') or post.get('viewCount') or 0
-                if views > 0:
-                    views_list.append(views)
-        
-        if views_list:
-            return int(sum(views_list) / len(views_list))
-        else:
-            return 0 # Hiç video yoksa 0
-            
-    except Exception as e:
-        return 0 # Hata varsa 0
+        # Önce normal deneme yap
+        return json.loads(raw_data)
+    except json.JSONDecodeError:
+        try:
+            # Hata verdiyse, başına ve sonuna köşeli parantez ekleyip dene
+            # Bu işlem senin hatanı çözen kısımdır.
+            fixed_data = f"[{raw_data}]"
+            return json.loads(fixed_data)
+        except:
+            return [] # Yine de olmazsa boş dön
+
+def get_avg_views_from_json(row):
+    """Ortalama izlenmeyi hesaplar"""
+    raw_data = row.get('posts_raw_data')
+    posts = safe_json_parse(raw_data) # Tamirciyi kullan
+
+    views_list = []
+    if posts and isinstance(posts, list):
+        for post in posts:
+            # Video izlenmesi (Farklı isimlerle gelebilir)
+            views = post.get('videoViewCount') or post.get('playCount') or post.get('viewCount') or 0
+            # Eğer 0'dan büyükse ve type Video ise veya views varsa al
+            if views > 0:
+                views_list.append(views)
+
+    if views_list:
+        return int(sum(views_list) / len(views_list))
+    else:
+        return 0
 
 def calculate_pure_metrics(row, cost_of_ad, total_revenue):
-    """CPM ve RPM Hesabı"""
+    """Saf CPM ve RPM Hesabı"""
     impressions = row.get('avg_views', 0)
     
     if impressions <= 0:
@@ -104,12 +125,18 @@ else:
         st.header("Ayarlar")
         cost_of_ad = st.number_input("Cost of Ad ($)", value=1000, step=100)
         total_revenue = st.number_input("Total Revenue ($)", value=1500, step=100)
+        
         st.divider()
         new_u = st.text_input("Kullanıcı Adı:")
-        if st.button("Analiz Et"):
+        if st.button("Veri Çek"):
             if new_u:
                 trigger_webhook(new_u)
                 st.success("İstek gönderildi.")
+        
+        st.divider()
+        if st.button("Çıkış"):
+            st.session_state['logged_in'] = False
+            st.rerun()
 
     st.title("📊 CPM & RPM Tablosu")
 
@@ -118,38 +145,49 @@ else:
     if response.data:
         df = pd.DataFrame(response.data)
         
-        # Hesaplamalar
+        # 1. İzlenmeleri Hesapla (Artık Hata Vermez)
         df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
+        
+        # 2. Metrikleri Hesapla
         metrics = df.apply(calculate_pure_metrics, args=(cost_of_ad, total_revenue), axis=1)
         df = pd.concat([df, metrics], axis=1)
         
-        # TABLO
+        # Tablo
+        df_display = df.sort_values(by='CPM ($)', ascending=True)
+        
         st.dataframe(
-            df[['username', 'avg_views', 'CPM ($)', 'RPM ($)']].style.format({
+            df_display[['username', 'avg_views', 'CPM ($)', 'RPM ($)']].style.format({
                 "avg_views": "{:,.0f}",
                 "CPM ($)": "${:.2f}",
                 "RPM ($)": "${:.2f}"
             }),
-            use_container_width=True
+            use_container_width=True,
+            height=500
         )
         
-        # --- 🛠️ HATA TESPİT KUTUSU (DEBUGGER) ---
-        st.markdown("---")
-        st.error("🛠️ HATA TESPİT ALANI (Geliştirici Modu)")
+        # Grafikler
+        df_chart = df[df['avg_views'] > 0]
+        if not df_chart.empty:
+            c1, c2 = st.columns(2)
+            with c1:
+                st.subheader("CPM (Maliyet)")
+                fig = px.bar(df_chart, x='username', y='CPM ($)', color='CPM ($)', text_auto='.2f')
+                st.plotly_chart(fig, use_container_width=True)
+            with c2:
+                st.subheader("RPM (Gelir)")
+                fig2 = px.bar(df_chart, x='username', y='RPM ($)', color='RPM ($)', text_auto='.2f')
+                st.plotly_chart(fig2, use_container_width=True)
         
-        st.write("Veritabanından gelen son veriyi kontrol ediyoruz...")
-        if not df.empty:
-            last_user = df.iloc[-1] # Listedeki son kişiyi al
-            st.write(f"**Son İncelenen Kişi:** {last_user['username']}")
-            st.write(f"**Bulunan Ortalama İzlenme:** {last_user['avg_views']}")
-            
-            raw = last_user.get('posts_raw_data')
-            if not raw:
-                st.warning("⚠️ SONUÇ: 'posts_raw_data' kutusu BOŞ! Make.com veriyi Supabase'e yazamıyor.")
-                st.info("ÇÖZÜM: Make.com -> Supabase modülünde 'posts_raw_data' eşleştirmesini kontrol et.")
-            else:
-                st.success("✅ SONUÇ: Veri Paketi (JSON) dolu görünüyor. İçeriği aşağıdadır:")
-                st.json(raw) # Gelen paketin içini göster
-        
+        # --- HATA KONTROLÜ (Son Durum) ---
+        with st.expander("🛠️ Veri Kontrolü"):
+            if not df.empty:
+                last_user = df.iloc[-1]
+                st.write(f"Son Kişi: {last_user['username']}")
+                st.write(f"Hesaplanan Ortalama İzlenme: {last_user['avg_views']}")
+                if last_user['avg_views'] > 0:
+                    st.success("✅ Veri başarıyla okundu ve hesaplandı!")
+                else:
+                    st.warning("⚠️ İzlenme hala 0 görünüyor. Kullanıcının son postlarında video olmayabilir.")
+
     else:
         st.info("Veri yok.")
