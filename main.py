@@ -2,15 +2,15 @@ import streamlit as st
 from supabase import create_client
 import pandas as pd
 import plotly.express as px
-import time
 import requests
 import json
 
 # -----------------------------------------------------------------------------
 # 1. AYARLAR VE GÜVENLİK
 # -----------------------------------------------------------------------------
-st.set_page_config(page_title="CPM/RPM Calculator", layout="wide", page_icon="🧮")
+st.set_page_config(page_title="Influencer Fiyat Hesaplayıcı", layout="wide", page_icon="💰")
 
+# Tablo Görünümü İyileştirme
 st.markdown("""
 <style>
     .big-font { font-size: 16px !important; }
@@ -35,7 +35,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # -----------------------------------------------------------------------------
-# 2. VERİ MOTORU (JSON TAMİR EDİCİ EKLENDİ)
+# 2. VERİ MOTORU
 # -----------------------------------------------------------------------------
 
 def trigger_webhook(username):
@@ -47,41 +47,27 @@ def trigger_webhook(username):
         return False
 
 def safe_json_parse(raw_data):
-    """
-    🛠️ ÖZEL TAMİR FONKSİYONU
-    Gelen veri {..}, {..} şeklindeyse bunu [{..}, {..}] şekline çevirir.
-    """
+    """JSON Tamirci"""
     if not raw_data: return []
-    
-    # Zaten listeyse direkt döndür
     if isinstance(raw_data, list): return raw_data
-    
-    # String değilse boş dön
     if not isinstance(raw_data, str): return []
-
     try:
-        # Önce normal deneme yap
         return json.loads(raw_data)
     except json.JSONDecodeError:
         try:
-            # Hata verdiyse, başına ve sonuna köşeli parantez ekleyip dene
-            # Bu işlem senin hatanı çözen kısımdır.
-            fixed_data = f"[{raw_data}]"
-            return json.loads(fixed_data)
+            return json.loads(f"[{raw_data}]")
         except:
-            return [] # Yine de olmazsa boş dön
+            return []
 
 def get_avg_views_from_json(row):
-    """Ortalama izlenmeyi hesaplar"""
+    """Ortalama İzlenme Hesabı"""
     raw_data = row.get('posts_raw_data')
-    posts = safe_json_parse(raw_data) # Tamirciyi kullan
+    posts = safe_json_parse(raw_data)
 
     views_list = []
     if posts and isinstance(posts, list):
         for post in posts:
-            # Video izlenmesi (Farklı isimlerle gelebilir)
             views = post.get('videoViewCount') or post.get('playCount') or post.get('viewCount') or 0
-            # Eğer 0'dan büyükse ve type Video ise veya views varsa al
             if views > 0:
                 views_list.append(views)
 
@@ -90,17 +76,25 @@ def get_avg_views_from_json(row):
     else:
         return 0
 
-def calculate_pure_metrics(row, cost_of_ad, total_revenue):
-    """Saf CPM ve RPM Hesabı"""
+def calculate_budget_offer(row, target_cpm, total_revenue_goal):
+    """
+    1. Önerilen Teklif (Budget): (İzlenme / 1000) * Hedef CPM
+    2. RPM: (Toplam Gelir Hedefi / İzlenme) * 1000
+    """
     impressions = row.get('avg_views', 0)
     
     if impressions <= 0:
-        return pd.Series([0, 0], index=['CPM ($)', 'RPM ($)'])
+        return pd.Series([0, 0], index=['Önerilen Teklif ($)', 'RPM ($)'])
 
-    cpm = (cost_of_ad / impressions) * 1000
-    rpm = (total_revenue / impressions) * 1000
+    # --- 1. ÖNERİLEN VİDEO FİYATI (BUDGET) ---
+    # Markanın hedeflediği CPM'e göre Influencer'ın hak ettiği para
+    recommended_offer = (impressions / 1000) * target_cpm
     
-    return pd.Series([cpm, rpm], index=['CPM ($)', 'RPM ($)'])
+    # --- 2. RPM (GELİR VERİMLİLİĞİ) ---
+    # Eğer bu kampanya hedeflenen ciroyu yaparsa verimlilik ne olur?
+    rpm = (total_revenue_goal / impressions) * 1000
+    
+    return pd.Series([recommended_offer, rpm], index=['Önerilen Teklif ($)', 'RPM ($)'])
 
 # -----------------------------------------------------------------------------
 # 3. ARAYÜZ
@@ -122,9 +116,14 @@ if not st.session_state['logged_in']:
                     st.error("Hata")
 else:
     with st.sidebar:
-        st.header("Ayarlar")
-        cost_of_ad = st.number_input("Cost of Ad ($)", value=1000, step=100)
-        total_revenue = st.number_input("Total Revenue ($)", value=1500, step=100)
+        st.header("💰 Bütçe Planlayıcı")
+        st.info("Influencer'a ne kadar ödemelisin?")
+        
+        # 1. KULLANICI GİRDİSİ: Hedef CPM
+        target_cpm = st.number_input("Hedeflediğiniz CPM ($)", value=5.0, step=0.5, help="1000 izlenme başına ödemeye razı olduğunuz tutar. (Piyasa ortalaması 5$-10$)")
+        
+        # 2. KULLANICI GİRDİSİ: Hedef Ciro
+        total_revenue = st.number_input("Hedeflenen Toplam Ciro ($)", value=2000, step=100, help="Bu videodan kazanmayı umduğunuz toplam para.")
         
         st.divider()
         new_u = st.text_input("Kullanıcı Adı:")
@@ -138,56 +137,57 @@ else:
             st.session_state['logged_in'] = False
             st.rerun()
 
-    st.title("📊 CPM & RPM Tablosu")
+    st.title("💸 Adil Fiyat Hesaplayıcı")
+    st.markdown(f"""
+    Bu analiz, belirlediğiniz **${target_cpm} CPM** (Birim Fiyat) üzerinden, 
+    her bir Influencer'a **video başına ne kadar teklif vermeniz gerektiğini** hesaplar.
+    """)
 
     response = supabase.table('influencers').select("*").execute()
     
     if response.data:
         df = pd.DataFrame(response.data)
         
-        # 1. İzlenmeleri Hesapla (Artık Hata Vermez)
+        # Hesaplamalar
         df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
-        
-        # 2. Metrikleri Hesapla
-        metrics = df.apply(calculate_pure_metrics, args=(cost_of_ad, total_revenue), axis=1)
+        metrics = df.apply(calculate_budget_offer, args=(target_cpm, total_revenue), axis=1)
         df = pd.concat([df, metrics], axis=1)
         
-        # Tablo
-        df_display = df.sort_values(by='CPM ($)', ascending=True)
+        # --- TABLO ---
+        df_valid = df[df['avg_views'] > 0].copy()
         
-        st.dataframe(
-            df_display[['username', 'avg_views', 'CPM ($)', 'RPM ($)']].style.format({
-                "avg_views": "{:,.0f}",
-                "CPM ($)": "${:.2f}",
-                "RPM ($)": "${:.2f}"
-            }),
-            use_container_width=True,
-            height=500
-        )
-        
-        # Grafikler
-        df_chart = df[df['avg_views'] > 0]
-        if not df_chart.empty:
-            c1, c2 = st.columns(2)
-            with c1:
-                st.subheader("CPM (Maliyet)")
-                fig = px.bar(df_chart, x='username', y='CPM ($)', color='CPM ($)', text_auto='.2f')
-                st.plotly_chart(fig, use_container_width=True)
-            with c2:
-                st.subheader("RPM (Gelir)")
-                fig2 = px.bar(df_chart, x='username', y='RPM ($)', color='RPM ($)', text_auto='.2f')
-                st.plotly_chart(fig2, use_container_width=True)
-        
-        # --- HATA KONTROLÜ (Son Durum) ---
-        with st.expander("🛠️ Veri Kontrolü"):
-            if not df.empty:
-                last_user = df.iloc[-1]
-                st.write(f"Son Kişi: {last_user['username']}")
-                st.write(f"Hesaplanan Ortalama İzlenme: {last_user['avg_views']}")
-                if last_user['avg_views'] > 0:
-                    st.success("✅ Veri başarıyla okundu ve hesaplandı!")
-                else:
-                    st.warning("⚠️ İzlenme hala 0 görünüyor. Kullanıcının son postlarında video olmayabilir.")
+        if not df_valid.empty:
+            # En yüksek tekliften düşüğe sırala
+            df_valid = df_valid.sort_values(by="Önerilen Teklif ($)", ascending=False)
+            
+            st.subheader("📋 Kime Ne Kadar Ödemelisiniz?")
+            st.dataframe(
+                df_valid[['username', 'avg_views', 'Önerilen Teklif ($)', 'RPM ($)']].style.format({
+                    "avg_views": "{:,.0f}",
+                    "Önerilen Teklif ($)": "${:,.2f}",
+                    "RPM ($)": "${:.2f}"
+                }),
+                use_container_width=True,
+                height=500
+            )
+            
+            # GRAFİK: Fiyat vs Performans
+            st.subheader("📊 Fiyat Analizi")
+            
+            
 
+            fig = px.scatter(
+                df_valid, 
+                x="avg_views", 
+                y="Önerilen Teklif ($)", 
+                size="Önerilen Teklif ($)", 
+                hover_name="username",
+                title=f"${target_cpm} CPM Hedefiyle Fiyat Dağılımı",
+                labels={"avg_views": "Ortalama İzlenme", "Önerilen Teklif ($)": "Video Başına Bütçe"}
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+        else:
+            st.warning("Video verisi yok.")
     else:
         st.info("Veri yok.")
