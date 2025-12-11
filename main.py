@@ -32,7 +32,7 @@ if 'logged_in' not in st.session_state:
 # -----------------------------------------------------------------------------
 
 def trigger_webhook(username):
-    webhook_url = "https://hook.eu2.make.com/BURAYA_SENIN_MAKE_LINKIN" 
+    webhook_url = "https://hook.eu1.make.com/ixxd5cuuqkhhkpd8sqn5soiyol0a952x" 
     try:
         requests.get(f"{webhook_url}?username={username}")
         return True
