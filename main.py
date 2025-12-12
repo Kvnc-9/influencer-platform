@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.express as px
 import requests
 import json
-import time  # Sayfa yenileme gecikmesi için eklendi
+import time
 
 # -----------------------------------------------------------------------------
 # 1. AYARLAR VE TASARIM
@@ -15,15 +15,13 @@ st.set_page_config(page_title="Influencer ROI Simülatörü", layout="wide", pag
 st.markdown("""
 <style>
     .metric-container {
-        background-color: #f0f2f6;
-        border-radius: 10px;
+        background-color: #ffffff;
+        border-radius: 12px;
         padding: 20px;
         margin-bottom: 20px;
-        border: 1px solid #d6d6d6;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
-    div[data-testid="stMetricValue"] { font-size: 20px; color: #333; }
-    .profit { color: green; font-weight: bold; }
-    .loss { color: red; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -44,10 +42,11 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # -----------------------------------------------------------------------------
-# 2. FONKSİYONLAR (Veri İşleme)
+# 2. FONKSİYONLAR
 # -----------------------------------------------------------------------------
 
 def trigger_webhook(username):
+    # BURAYA KENDİ MAKE.COM WEBHOOK LINKINI YAPIŞTIR
     webhook_url = "https://hook.eu1.make.com/ixxd5cuuqkhhkpd8sqn5soiyol0a952x" 
     try:
         requests.get(f"{webhook_url}?username={username}")
@@ -55,20 +54,18 @@ def trigger_webhook(username):
     except:
         return False
 
-# --- YENİ EKLENEN FONKSİYON: VERİTABANI TEMİZLEME ---
 def clear_database():
-    """Supabase tablosundaki tüm verileri siler"""
+    """TÜM VERİYİ SİLER"""
     try:
-        # 'id' sütunu 0'a eşit olmayan (yani hepsi) verileri sil
+        # Tüm satırları sil (RLS Policy kapalı olmalı)
         supabase.table('influencers').delete().neq("id", 0).execute()
         return True
     except Exception as e:
-        st.error(f"Silme işlemi başarısız: {e}")
+        st.error(f"Silme hatası: {e}")
         return False
-# ----------------------------------------------------
 
 def safe_json_parse(raw_data):
-    """JSON Format Düzeltici"""
+    """Bozuk JSON verisini (parantez eksikse) tamir eder"""
     if not raw_data: return []
     if isinstance(raw_data, list): return raw_data
     if not isinstance(raw_data, str): return []
@@ -81,7 +78,7 @@ def safe_json_parse(raw_data):
             return []
 
 def get_avg_views_from_json(row):
-    """Ortalama İzlenme Hesaplayıcı"""
+    """Video izlenmelerini çeker ve ortalamasını alır"""
     raw_data = row.get('posts_raw_data')
     posts = safe_json_parse(raw_data)
     views_list = []
@@ -98,181 +95,163 @@ def get_avg_views_from_json(row):
 
 def calculate_roi_metrics(row, ad_cost, clicks, product_price):
     """
-    YENİ FORMÜLLER:
     CPM = (Reklam Maliyeti / İzlenme) * 1000
     RPM = ((Tıklanma * Ürün Fiyatı) / İzlenme) * 1000
-    Kâr/Zarar = RPM - CPM
+    Fark = RPM - CPM
     """
     views = row.get('avg_views', 0)
-    
     if views <= 0:
         return pd.Series([0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Fark ($)'])
 
-    # 1. CPM (Maliyet)
     cpm = (ad_cost / views) * 1000
-    
-    # 2. RPM (Gelir Potansiyeli)
-    total_revenue = clicks * product_price # Toplam Beklenen Ciro
+    total_revenue = clicks * product_price 
     rpm = (total_revenue / views) * 1000
-    
-    # 3. Fark (Profitability)
     diff = rpm - cpm
     
     return pd.Series([cpm, rpm, diff], index=['CPM ($)', 'RPM ($)', 'Fark ($)'])
 
 # -----------------------------------------------------------------------------
-# 3. ARAYÜZ (UI)
+# 3. ARAYÜZ
 # -----------------------------------------------------------------------------
 
-# --- GİRİŞ EKRANI ---
+# --- GİRİŞ EKRANI (Takılma Sorunu Çözüldü) ---
 if not st.session_state['logged_in']:
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         st.markdown("<br><br><h2 style='text-align: center;'>🔐 Giriş</h2>", unsafe_allow_html=True)
-        with st.form("login"):
-            email = st.text_input("Kullanıcı Adı")
-            password = st.text_input("Şifre", type="password")
-            if st.form_submit_button("Panel'e Git", use_container_width=True):
+        
+        # Form yapısı kaldırıldı, doğrudan input
+        email = st.text_input("Kullanıcı Adı")
+        password = st.text_input("Şifre", type="password")
+        
+        if st.button("Panel'e Git", type="primary", use_container_width=True):
+            with st.spinner("Giriş yapılıyor..."):
                 try:
                     supabase.auth.sign_in_with_password({"email": email, "password": password})
                     st.session_state['logged_in'] = True
                     st.rerun()
                 except:
-                    st.error("Hatalı Giriş")
+                    st.error("Hatalı Giriş! Bilgileri kontrol edin.")
 
 # --- ANA DASHBOARD ---
 else:
-    # Sidebar (Sadece İşlemler)
+    # Sidebar
     with st.sidebar:
-        st.header("⚙️ İşlemler")
-        new_u = st.text_input("Yeni Kişi Ekle:")
-        if st.button("Analiz Başlat 🚀"):
+        st.header("⚙️ Kontrol Paneli")
+        
+        # Yeni Kişi Ekleme
+        new_u = st.text_input("Yeni Analiz (Kullanıcı Adı):")
+        if st.button("Analiz Et 🚀", use_container_width=True):
             if new_u:
-                trigger_webhook(new_u)
-                st.success("İstek gönderildi.")
+                with st.spinner("Make.com tetikleniyor..."):
+                    trigger_webhook(new_u)
+                    st.success("İşlem Başlatıldı! Veri bekleniyor...")
         
         st.divider()
         
-        # --- YENİ EKLENEN BUTON: VERİLERİ TEMİZLE ---
+        # Temizleme Butonu
         st.markdown("### ⚠️ Veri Yönetimi")
-        if st.button("🗑️ Tüm Listeyi Temizle", type="primary", use_container_width=True):
-            with st.spinner("Veritabanı temizleniyor..."):
-                if clear_database():
-                    st.success("Tüm veriler silindi!")
-                    time.sleep(1) # Kullanıcı mesajı görsün diye bekle
-                    st.rerun()    # Sayfayı yenile
-        # --------------------------------------------
-
+        if st.button("🗑️ TÜM LİSTEYİ SİL", type="primary", use_container_width=True):
+            if clear_database():
+                st.toast("Veritabanı temizlendi!", icon="✅")
+                time.sleep(1)
+                st.rerun()
+        
         st.divider()
         if st.button("Çıkış Yap"):
             st.session_state['logged_in'] = False
             st.rerun()
 
-    # --- ÜST PANEL: SİMÜLASYON GİRDİLERİ (INPUTS) ---
+    # --- ÜST PANEL: SİMÜLASYON GİRDİLERİ ---
     st.title("📈 Influencer Kârlılık Simülatörü")
-    st.markdown("Aşağıdaki parametreleri değiştirerek **CPM (Maliyet)** ve **RPM (Gelir)** senaryolarını test edin.")
 
     with st.container():
         st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+        
+        # Girişler (Inputs)
         c1, c2, c3 = st.columns(3)
-        
         with c1:
-            st.markdown("### 1. Reklam Maliyeti")
-            ad_cost = st.number_input("Influencer'a Ödenecek Tutar ($)", value=1000, step=100, help="Cost of the Ad")
-            
+            st.markdown("##### 1. Reklam Maliyeti")
+            ad_cost = st.number_input("Influencer'a ödenecek ($)", value=1000, step=100)
         with c2:
-            st.markdown("### 2. Beklenen Etkileşim")
-            exp_clicks = st.number_input("Tahmini Tıklanma Sayısı", value=500, step=50, help="Influencer'dan kaç kişi linke tıklar?")
-            
+            st.markdown("##### 2. Beklenen Tıklama")
+            exp_clicks = st.number_input("Tahmini Tıklanma Sayısı", value=500, step=50)
         with c3:
-            st.markdown("### 3. Ürün Değeri")
-            prod_price = st.number_input("Ürün Satış Fiyatı ($)", value=30.0, step=5.0, help="Sattığınız ürünün ortalama fiyatı")
+            st.markdown("##### 3. Ürün Fiyatı")
+            prod_price = st.number_input("Ürün Satış Fiyatı ($)", value=30.0, step=5.0)
         
+        st.divider()
+        
+        # Sonuç Göstergeleri (Native Metrics)
+        total_rev = exp_clicks * prod_price
+        net_profit = total_rev - ad_cost
+        
+        m1, m2 = st.columns(2)
+        m1.metric(label="Hedeflenen Toplam Ciro", value=f"${total_rev:,.0f}")
+        m2.metric(
+            label="Net Kâr / Zarar Durumu", 
+            value=f"${net_profit:,.0f}", 
+            delta="KÂR" if net_profit > 0 else "ZARAR",
+            delta_color="normal" # Artıysa Yeşil, Eksiyse Kırmızı
+        )
         st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Hızlı Hesap Göstergesi
-        total_potential_revenue = exp_clicks * prod_price
-        roi_status = "KÂR" if total_potential_revenue > ad_cost else "ZARAR"
-        roi_color = "green" if total_potential_revenue > ad_cost else "red"
-        
-        st.markdown(f"""
-        <p style='text-align: center; font-size: 18px;'>
-        Bu senaryoda toplam <b>${total_potential_revenue:,.0f}</b> ciro hedefleniyor. 
-        Maliyet çıktıktan sonra durum: <span style='color:{roi_color}; font-weight:bold'>{roi_status} (${total_potential_revenue - ad_cost:,.0f})</span>
-        </p>
-        """, unsafe_allow_html=True)
 
-    # --- VERİ ÇEKME VE HESAPLAMA ---
+    # --- VERİ LİSTESİ ---
     response = supabase.table('influencers').select("*").execute()
     
     if response.data:
         df = pd.DataFrame(response.data)
         
-        # --- Hata Düzeltici (Niche Kontrolü) ---
+        # Niche Kontrolü
         if 'Niche' not in df.columns:
-            if 'niche' in df.columns:
-                df['Niche'] = df['niche']
-            else:
-                df['Niche'] = "-"
-        # ---------------------------------------
-
-        # 1. Ort. İzlenme Hesabı
-        df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
+            if 'niche' in df.columns: df['Niche'] = df['niche']
+            else: df['Niche'] = "-"
+        df['Niche'] = df['Niche'].fillna("-")
         
-        # 2. CPM / RPM / Fark Hesabı (Yeni Formüllerle)
+        # Hesaplamalar
+        df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
         metrics = df.apply(calculate_roi_metrics, args=(ad_cost, exp_clicks, prod_price), axis=1)
         df = pd.concat([df, metrics], axis=1)
         
-        # Sadece verisi olanları al
         df_valid = df[df['avg_views'] > 0].copy()
         
         if not df_valid.empty:
-            # 3. EN KÂRLI OLANI BUL (Grafik İçin)
-            # Fark ($) sütununa göre sırala (En yüksek kâr en üstte)
             df_valid = df_valid.sort_values(by="Fark ($)", ascending=False)
             
-            # --- TABLO ---
-            st.subheader("📋 Detaylı Analiz Tablosu")
+            st.subheader("📋 Analiz Tablosu")
             
-            # Gösterilecek Sütunlar
-            table_cols = ['username', 'Niche', 'avg_views', 'CPM ($)', 'RPM ($)', 'Fark ($)']
+            cols = ['username', 'Niche', 'avg_views', 'CPM ($)', 'RPM ($)', 'Fark ($)']
             
-            # Tabloyu Renklendirme Fonksiyonu
             def highlight_profit(val):
-                color = '#d4edda' if val > 0 else '#f8d7da' # Yeşil veya Kırmızı arka plan
+                color = '#d1e7dd' if val > 0 else '#f8d7da'
                 return f'background-color: {color}'
 
             st.dataframe(
-                df_valid[table_cols].style.format({
+                df_valid[cols].style.format({
                     "avg_views": "{:,.0f}",
                     "CPM ($)": "${:.2f}",
                     "RPM ($)": "${:.2f}",
-                    "Fark ($)": "${:+.2f}" # Artı/Eksi işareti koy
+                    "Fark ($)": "${:+.2f}"
                 }).applymap(highlight_profit, subset=['Fark ($)']),
                 use_container_width=True,
-                height=400
+                height=450
             )
             
-            # --- GRAFİK ---
-            st.markdown("---")
-            st.subheader("🏆 Kârlılık Karşılaştırması (RPM - CPM)")
-            st.caption("Çubuk ne kadar yüksekse, Influencer o kadar kârlıdır. Sıfırın altı zarar demektir.")
-            
+            st.subheader("📊 Kârlılık Sıralaması")
             fig = px.bar(
                 df_valid,
                 x='username',
                 y='Fark ($)',
                 color='Fark ($)',
-                text_auto='+.2f',
                 title="Hangi Influencer Daha Fazla Kazandırır?",
-                color_continuous_scale=['red', 'green'], # Kırmızıdan Yeşile
-                labels={'Fark ($)': 'Net Kâr Potansiyeli (Birim Başına)'}
+                text_auto='+.0f',
+                color_continuous_scale=['red', 'green'],
+                labels={'Fark ($)': 'Net Kâr ($)'}
             )
-            # Sıfır çizgisini ekle
-            fig.add_hline(y=0, line_dash="dot", annotation_text="Başabaş Noktası", annotation_position="bottom right")
+            fig.add_hline(y=0, line_dash="dot", line_color="black")
             st.plotly_chart(fig, use_container_width=True)
             
         else:
-            st.warning("Veri var ama videolu gönderi bulunamadı.")
+            st.warning("Veri var ama videolu gönderi bulunamadı. Yeni birini analiz edin.")
     else:
-        st.info("Veritabanı boş.")
+        st.info("Veritabanı boş. Sol menüden yeni kişi ekleyin.")
