@@ -222,5 +222,36 @@ if response.data:
         )
         
         # --- YENİ SCATTER PLOT GRAFİĞİ (İSTEK ÜZERİNE) ---
-        st.
-      
+        st.subheader("📊 Influencer Karşılaştırması (CPM vs RPM)")
+        st.info("💡 **Nasıl Okunur:** Sağ ve Yukarıdaki noktalar en kârlı olanlardır.")
+
+        fig = px.scatter(
+            df_valid,
+            x="CPM ($)",      # X ekseni: Maliyet
+            y="RPM ($)",      # Y ekseni: Gelir
+            color="Niche",    # Renk: Kategori
+            size="avg_views", # Boyut: İzlenme Gücü
+            hover_name="username",
+            text="username",  # İsimler noktaların yanında
+            title="Maliyet (CPM) ve Gelir (RPM) Analizi",
+            labels={"CPM ($)": "Maliyet (Düşük İyidir)", "RPM ($)": "Gelir (Yüksek İyidir)"},
+            height=600
+        )
+        
+        # İsimlerin pozisyonunu ayarla
+        fig.update_traces(textposition='top center')
+        
+        # Başabaş Noktası Çizgisi (Kâr/Zarar Sınırı)
+        max_limit = max(df_valid['CPM ($)'].max(), df_valid['RPM ($)'].max()) * 1.1
+        fig.add_shape(
+            type="line", line=dict(dash='dash', color="gray"),
+            x0=0, y0=0, x1=max_limit, y1=max_limit
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        # ---------------------------------------------------
+        
+    else:
+        st.warning("Veri var ama videolu gönderi bulunamadı.")
+else:
+    st.info("Veritabanı boş. Sol menüden yeni kişi ekleyin.")
