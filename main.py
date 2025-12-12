@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 import requests
 import json
+import time  # Sayfa yenileme gecikmesi için eklendi
 
 # -----------------------------------------------------------------------------
 # 1. AYARLAR VE TASARIM
@@ -53,6 +54,18 @@ def trigger_webhook(username):
         return True
     except:
         return False
+
+# --- YENİ EKLENEN FONKSİYON: VERİTABANI TEMİZLEME ---
+def clear_database():
+    """Supabase tablosundaki tüm verileri siler"""
+    try:
+        # 'id' sütunu 0'a eşit olmayan (yani hepsi) verileri sil
+        supabase.table('influencers').delete().neq("id", 0).execute()
+        return True
+    except Exception as e:
+        st.error(f"Silme işlemi başarısız: {e}")
+        return False
+# ----------------------------------------------------
 
 def safe_json_parse(raw_data):
     """JSON Format Düzeltici"""
@@ -139,6 +152,18 @@ else:
                 st.success("İstek gönderildi.")
         
         st.divider()
+        
+        # --- YENİ EKLENEN BUTON: VERİLERİ TEMİZLE ---
+        st.markdown("### ⚠️ Veri Yönetimi")
+        if st.button("🗑️ Tüm Listeyi Temizle", type="primary", use_container_width=True):
+            with st.spinner("Veritabanı temizleniyor..."):
+                if clear_database():
+                    st.success("Tüm veriler silindi!")
+                    time.sleep(1) # Kullanıcı mesajı görsün diye bekle
+                    st.rerun()    # Sayfayı yenile
+        # --------------------------------------------
+
+        st.divider()
         if st.button("Çıkış Yap"):
             st.session_state['logged_in'] = False
             st.rerun()
@@ -183,6 +208,14 @@ else:
     if response.data:
         df = pd.DataFrame(response.data)
         
+        # --- Hata Düzeltici (Niche Kontrolü) ---
+        if 'Niche' not in df.columns:
+            if 'niche' in df.columns:
+                df['Niche'] = df['niche']
+            else:
+                df['Niche'] = "-"
+        # ---------------------------------------
+
         # 1. Ort. İzlenme Hesabı
         df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
         
@@ -225,8 +258,6 @@ else:
             st.subheader("🏆 Kârlılık Karşılaştırması (RPM - CPM)")
             st.caption("Çubuk ne kadar yüksekse, Influencer o kadar kârlıdır. Sıfırın altı zarar demektir.")
             
-            
-
             fig = px.bar(
                 df_valid,
                 x='username',
