@@ -11,24 +11,22 @@ import time
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Influencer ROI Simülatörü", layout="wide", page_icon="✨")
 
-# BURASI SİTENİN GÖRÜNÜMÜNÜ OLUŞTURAN KISIM (CSS)
+# CSS TASARIMI (Aynı Kaldı)
 st.markdown("""
 <style>
-    /* 1. ARKA PLAN: Görseldeki Mor-Turuncu Geçiş */
+    /* ARKA PLAN */
     .stApp {
         background: linear-gradient(135deg, #240b36 0%, #c31432 100%);
         background-attachment: fixed;
         color: white;
     }
-
-    /* 2. SIDEBAR: Buzlu Cam Efekti */
+    /* SIDEBAR */
     section[data-testid="stSidebar"] {
         background-color: rgba(0, 0, 0, 0.2);
         backdrop-filter: blur(20px);
         border-right: 1px solid rgba(255, 255, 255, 0.1);
     }
-    
-    /* 3. KUTULAR (Metric Container): Şeffaf ve Modern */
+    /* KUTULAR */
     .metric-container {
         background: rgba(255, 255, 255, 0.1);
         border-radius: 15px;
@@ -38,34 +36,23 @@ st.markdown("""
         backdrop-filter: blur(10px);
         box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
     }
-
-    /* 4. TABLO TASARIMI */
+    /* TABLO */
     .stDataFrame {
         background-color: rgba(0, 0, 0, 0.3);
         border-radius: 10px;
         padding: 10px;
     }
-
-    /* 5. METİNLER VE BAŞLIKLAR */
-    h1, h2, h3 {
-        color: white !important;
-        font-family: 'Helvetica Neue', sans-serif;
-        font-weight: 700;
-    }
-    label {
-        color: #e0e0e0 !important;
-        font-weight: bold;
-    }
-    
-    /* 6. INPUT ALANLARI */
+    /* METİNLER */
+    h1, h2, h3 { color: white !important; font-family: 'Helvetica Neue', sans-serif; font-weight: 700; }
+    label { color: #e0e0e0 !important; font-weight: bold; }
+    /* INPUT */
     div[data-baseweb="input"] {
         background-color: rgba(0, 0, 0, 0.3) !important;
         border: 1px solid rgba(255, 255, 255, 0.2) !important; 
         color: white !important;
     }
     input { color: white !important; }
-
-    /* 7. KAZANAN KARTI (WINNER BOX) */
+    /* KAZANAN KARTI */
     .winner-box {
         background: linear-gradient(90deg, #11998e, #38ef7d);
         color: white;
@@ -78,7 +65,6 @@ st.markdown("""
     }
     .winner-title { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
     .winner-stat { font-size: 18px; opacity: 0.9; }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -95,7 +81,6 @@ def init_supabase():
 
 supabase = init_supabase()
 
-# Session State
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
@@ -104,7 +89,6 @@ if 'logged_in' not in st.session_state:
 # -----------------------------------------------------------------------------
 
 def trigger_webhook(username):
-    # SENİN MAKE.COM LİNKİN
     webhook_url = "https://hook.eu1.make.com/ixxd5cuuqkhhkpd8sqn5soiyol0a952x"
     try:
         requests.get(f"{webhook_url}?username={username}")
@@ -113,7 +97,6 @@ def trigger_webhook(username):
         return False
 
 def clear_database():
-    """TÜM VERİYİ SİLER"""
     try:
         supabase.table('influencers').delete().neq("username", "xxxx").execute()
         return True
@@ -148,19 +131,65 @@ def get_avg_views_from_json(row):
     else:
         return 0
 
-def calculate_roi_metrics(row, ad_cost, clicks, product_price):
+def calculate_roi_metrics(row, ad_cost, base_clicks, product_price, global_avg_views):
+    """
+    DÜZELTİLMİŞ HESAPLAMA MANTIĞI (CPM & RPM & NICHE Odaklı):
+    Artık herkesin kârı aynı çıkmayacak. İzlenme sayısına ve Kategoriye göre değişecek.
+    """
     views = row.get('avg_views', 0)
+    niche = row.get('Niche', 'Genel')
     
     if views <= 0:
         return pd.Series([0, 0, 0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Net Kâr ($)', 'ROI (x)', 'Brand Score'])
 
-    # Hesaplamalar
+    # --- 1. NICHE (KATEGORİ) ÇARPANLARI ---
+    # Bazı kategoriler daha değerlidir (Daha yüksek dönüşüm/tıklama getirir)
+    niche_weights = {
+        'Tech': 1.3,       # Teknoloji izleyicisi daha çok tıklar
+        'Business': 1.3,
+        'Finance': 1.4,
+        'Fashion': 1.2,
+        'Beauty': 1.2,
+        'Gaming': 1.1,
+        'Travel': 1.0,
+        'Food': 0.9,
+        'General': 0.8,    # Genel mizah sayfalarının dönüşümü düşüktür
+        'Comedy': 0.8
+    }
+    # Eğer kategori listede yoksa varsayılan 1.0 al
+    niche_multiplier = niche_weights.get(niche, 1.0)
+
+    # --- 2. DİNAMİK TIKLAMA TAHMİNİ ---
+    # Kullanıcının girdiği "Beklenen Tıklama" (base_clicks) ortalama bir hesap içindir.
+    # Bunu şu anki Influencer'ın izlenmesine göre oranlıyoruz (Scale ediyoruz).
+    # Formül: (Kendi İzlenmesi / Ortamala İzlenme) * Baz Tıklama * Niche Gücü
+    view_performance_ratio = views / global_avg_views if global_avg_views > 0 else 1
+    
+    estimated_clicks = base_clicks * view_performance_ratio * niche_multiplier
+    
+    # --- 3. METRİKLER ---
+    
+    # CPM (Cost Per Mille): 1000 izlenme maliyeti
+    # İzlenmesi yüksek olanın CPM'i düşük çıkar (İyi bir şey)
     cpm = (ad_cost / views) * 1000
-    total_revenue = clicks * product_price 
-    rpm = (total_revenue / views) * 1000
-    net_profit = total_revenue - ad_cost
-    roi_x = total_revenue / ad_cost if ad_cost > 0 else 0
-    brand_score = min(99, int((roi_x * 25) + 30)) 
+    
+    # Tahmini Gelir (Revenue)
+    estimated_revenue = estimated_clicks * product_price
+    
+    # RPM (Revenue Per Mille): 1000 izlenme başına kazanç
+    rpm = (estimated_revenue / views) * 1000
+    
+    # Net Kâr
+    net_profit = estimated_revenue - ad_cost
+    
+    # ROI Çarpanı
+    roi_x = estimated_revenue / ad_cost if ad_cost > 0 else 0
+    
+    # Brand Score (Marka Puanı)
+    # ROI ve Niche Kalitesine göre 0-100 arası puan
+    # Niche çarpanı yüksekse puanı artırır.
+    raw_score = (roi_x * 20) + (niche_multiplier * 20)
+    brand_score = min(99, max(1, int(raw_score)))
     
     return pd.Series([cpm, rpm, net_profit, roi_x, brand_score], 
                      index=['CPM ($)', 'RPM ($)', 'Net Kâr ($)', 'ROI (x)', 'Brand Score'])
@@ -169,7 +198,6 @@ def calculate_roi_metrics(row, ad_cost, clicks, product_price):
 # 3. ARAYÜZ
 # -----------------------------------------------------------------------------
 
-# --- GİRİŞ PANELİ ---
 if not st.session_state['logged_in']:
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
@@ -193,7 +221,6 @@ if not st.session_state['logged_in']:
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-# --- DASHBOARD ---
 else:
     with st.sidebar:
         st.title("KONTROL PANELİ")
@@ -218,11 +245,9 @@ else:
             st.session_state['logged_in'] = False
             st.rerun()
 
-    # --- ANA EKRAN ---
     st.title("📈 Influencer ROI Simülatörü")
     st.markdown("Yapay Zeka Destekli Finansal Analiz Aracı")
     
-    # GİRDİ ALANLARI
     with st.container():
         st.markdown('<div class="metric-container">', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
@@ -230,37 +255,41 @@ else:
             st.markdown("### 💸 Maliyet")
             ad_cost = st.number_input("Influencer Bütçesi ($)", value=1000, step=100)
         with c2:
-            st.markdown("### 🖱️ Etkileşim")
-            exp_clicks = st.number_input("Beklenen Tıklama", value=500, step=50)
+            st.markdown("### 🖱️ Ort. Tıklama")
+            exp_clicks = st.number_input("Beklenen Tıklama (Ortalama)", value=500, step=50, help="Ortalama bir influencer için beklenen tıklama.")
         with c3:
             st.markdown("### 🏷️ Ürün")
             prod_price = st.number_input("Ürün Fiyatı ($)", value=30.0, step=5.0)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- VERİ İŞLEME ---
     response = supabase.table('influencers').select("*").execute()
     
     if response.data:
         df = pd.DataFrame(response.data)
         
-        # Niche Kontrolü
         if 'Niche' not in df.columns:
             if 'niche' in df.columns: df['Niche'] = df['niche']
             else: df['Niche'] = "Genel"
         df['Niche'] = df['Niche'].fillna("Genel").replace("", "Genel")
 
-        # Hesaplamalar
+        # 1. İzlenmeleri Hesapla
         df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
-        metrics = df.apply(calculate_roi_metrics, args=(ad_cost, exp_clicks, prod_price), axis=1)
+        
+        # 2. Tüm listenin ortalama izlenmesini bul (Karşılaştırma için)
+        global_avg_views = df[df['avg_views'] > 0]['avg_views'].mean()
+        if pd.isna(global_avg_views) or global_avg_views == 0:
+            global_avg_views = 1  # 0'a bölme hatasını önle
+
+        # 3. Metrikleri Hesapla (Artık global_avg_views parametresi gönderiyoruz)
+        metrics = df.apply(calculate_roi_metrics, args=(ad_cost, exp_clicks, prod_price, global_avg_views), axis=1)
         df = pd.concat([df, metrics], axis=1)
         
         df_valid = df[df['avg_views'] > 0].copy()
         
         if not df_valid.empty:
-            # En kârlı olanı bulmak için sırala
             df_valid = df_valid.sort_values(by="Net Kâr ($)", ascending=False)
             
-            # --- 🏆 KAZANANI BUL VE GÖSTER ---
+            # --- 🏆 KAZANAN ---
             winner = df_valid.iloc[0]
             if winner['Net Kâr ($)'] > 0:
                 st.markdown(f"""
@@ -274,18 +303,22 @@ else:
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.error("⚠️ Mevcut senaryoda kârlı bir influencer bulunamadı.")
+                st.error("⚠️ Bu bütçeyle kârlı bir seçenek bulunamadı. Beklenen tıklamayı artırın veya bütçeyi düşürün.")
 
             # --- TABLO ---
             st.subheader("📋 Detaylı Finansal Tablo")
             
             cols = ['username', 'Niche', 'avg_views', 'Brand Score', 'CPM ($)', 'RPM ($)', 'ROI (x)', 'Net Kâr ($)']
             
-            # Matplotlib gerektirmeyen manuel renklendirme fonksiyonu
-            def highlight_profit(val):
-                # Kâr pozitifse açık yeşil, negatifse açık kırmızı (yazı siyah olsun diye color:black ekledim)
-                color = '#d4edda' if val > 0 else '#f8d7da'
-                return f'background-color: {color}; color: black;'
+            # HATA VERMEYEN GÜVENLİ RENKLENDİRME (Matplotlib'siz)
+            def safe_highlight(val):
+                try:
+                    # Sayısal değer değilse renklendirme
+                    if isinstance(val, str): return ''
+                    color = '#d4edda' if val > 0 else '#f8d7da'
+                    return f'background-color: {color}; color: black;'
+                except:
+                    return ''
 
             st.dataframe(
                 df_valid[cols].style.format({
@@ -295,12 +328,12 @@ else:
                     "RPM ($)": "${:.2f}",
                     "ROI (x)": "{:.2f}x",
                     "Net Kâr ($)": "${:+.2f}"
-                }).applymap(highlight_profit, subset=['Net Kâr ($)']), # Matplotlib gerektirmeyen güvenli yöntem
+                }).applymap(safe_highlight, subset=['Net Kâr ($)']),
                 use_container_width=True,
                 height=400
             )
             
-            # --- GRAFİK (NOKTALI - SCATTER) ---
+            # --- GRAFİK ---
             st.markdown("---")
             st.subheader("📊 Grafiksel Karşılaştırma")
             
@@ -313,7 +346,7 @@ else:
                 hover_name="username",
                 hover_data=["ROI (x)", "Brand Score"],
                 text="username",
-                title="Maliyet vs Gelir Analizi (Büyük Nokta = Çok Kâr)",
+                title="Maliyet vs Gelir Analizi (Sağ Üst = En İyi)",
                 labels={"CPM ($)": "Maliyet (CPM)", "RPM ($)": "Gelir (RPM)"},
                 height=600,
                 template="plotly_dark"
@@ -326,10 +359,14 @@ else:
             )
             fig.update_traces(textposition='top center')
             
-            max_limit = max(df_valid['CPM ($)'].max(), df_valid['RPM ($)'].max()) * 1.1
+            # Çizgiyi dinamik ayarla
+            max_x = df_valid['CPM ($)'].max()
+            max_y = df_valid['RPM ($)'].max()
+            limit = max(max_x, max_y) * 1.1 if max_x and max_y else 100
+            
             fig.add_shape(
                 type="line", line=dict(dash='dash', color="gray"),
-                x0=0, y0=0, x1=max_limit, y1=max_limit
+                x0=0, y0=0, x1=limit, y1=limit
             )
             
             st.plotly_chart(fig, use_container_width=True)
