@@ -176,42 +176,28 @@ def get_avg_views_from_json(row):
     else:
         return 0
 
-def calculate_roi_metrics(row, ad_cost, clicks, product_price, global_avg_views):
+def calculate_roi_metrics(row, ad_cost, clicks, product_price):
     """
-    YENİ HESAPLAMA MANTIĞI:
-    ROI = ((RPM - CPM) / CPM) * 100
-    Sıralama: RPM ve CPM arasındaki Fark ($)
+    SADE VE NET FORMÜLLER:
+    Hiçbir yapay zeka yorumu yok. Sadece matematik.
     """
     views = row.get('avg_views', 0)
-    niche = row.get('Niche', 'Genel')
     
+    # İzlenme 0 ise hata vermesin diye 0 döndür
     if views <= 0:
         return pd.Series([0, 0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
 
-    # Niche Çarpanları
-    niche_weights = {
-        'Tech': 1.3, 'Business': 1.3, 'Finance': 1.4, 'Fashion': 1.2,
-        'Beauty': 1.2, 'Gaming': 1.1, 'Travel': 1.0, 'Food': 0.9,
-        'General': 0.8, 'Comedy': 0.8
-    }
-    niche_multiplier = niche_weights.get(niche, 1.0)
-    
-    # Dinamik Tıklama Tahmini (İzlenmeye göre ölçekle)
-    view_performance_ratio = views / global_avg_views if global_avg_views > 0 else 1
-    estimated_clicks = clicks * view_performance_ratio * niche_multiplier
-    
-    # 1. CPM (Maliyet)
+    # 1. CPM (Maliyet) = (Bütçe / İzlenme) * 1000
     cpm = (ad_cost / views) * 1000
     
-    # 2. RPM (Gelir)
-    estimated_revenue = estimated_clicks * product_price
-    rpm = (estimated_revenue / views) * 1000
+    # 2. RPM (Gelir) = (Beklenen Tıklama * Ürün Fiyatı / İzlenme) * 1000
+    # SENİN VERDİĞİN FORMÜL BURADA UYGULANDI
+    rpm = ((clicks * product_price) / views) * 1000
     
-    # 3. FARK (Sıralama Kriteri)
+    # 3. FARK (Sıralama için)
     diff = rpm - cpm
     
-    # 4. ROI HESABI (İstediğin Formül)
-    # ROI = ((RPM - CPM) / CPM) * 100
+    # 4. ROI (%) = ((RPM - CPM) / CPM) * 100
     if cpm > 0:
         roi_percent = ((rpm - cpm) / cpm) * 100
     else:
@@ -305,8 +291,8 @@ else:
         ad_cost = st.number_input("Influencer Bütçesi ($)", value=1000, step=100, label_visibility="collapsed")
     
     with col2:
-        st.markdown("<h4 style='margin:0; opacity:0.8;'>🖱️ ORT. TIKLAMA</h4>", unsafe_allow_html=True)
-        exp_clicks = st.number_input("Beklenen Tıklama", value=500, step=50, label_visibility="collapsed")
+        st.markdown("<h4 style='margin:0; opacity:0.8;'>🖱️ BEKLENEN TIKLAMA</h4>", unsafe_allow_html=True)
+        exp_clicks = st.number_input("Toplam Tıklama Sayısı", value=500, step=50, label_visibility="collapsed")
     
     with col3:
         st.markdown("<h4 style='margin:0; opacity:0.8;'>🏷️ ÜRÜN</h4>", unsafe_allow_html=True)
@@ -326,16 +312,15 @@ else:
 
         # Hesaplamalar
         df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
-        global_avg_views = df[df['avg_views'] > 0]['avg_views'].mean()
-        if pd.isna(global_avg_views) or global_avg_views == 0: global_avg_views = 1
-
-        metrics = df.apply(calculate_roi_metrics, args=(ad_cost, exp_clicks, prod_price, global_avg_views), axis=1)
+        
+        # calculate_roi_metrics'e artık SADECE girdileri gönderiyoruz (Global ortalama vs yok)
+        metrics = df.apply(calculate_roi_metrics, args=(ad_cost, exp_clicks, prod_price), axis=1)
         df = pd.concat([df, metrics], axis=1)
         
         df_valid = df[df['avg_views'] > 0].copy()
         
         if not df_valid.empty:
-            # Sıralamayı (RPM - CPM) Farkına göre yap
+            # Sıralamayı (RPM - CPM) Farkına göre yap (En çok kar bırakan)
             df_valid = df_valid.sort_values(by="Fark ($)", ascending=False)
             
             # KAZANAN KARTI
@@ -355,11 +340,11 @@ else:
                 st.markdown("""
                 <div class='glass-card' style='border-left: 5px solid #ff4b1f; background: rgba(255, 75, 31, 0.1);'>
                     <h3 style='color:#ff4b1f; margin:0;'>⚠️ Kârlı Senaryo Bulunamadı</h3>
-                    <p>RPM değerleri CPM'den düşük kalıyor. Bütçeyi düşürmeyi deneyin.</p>
+                    <p>RPM değerleri CPM'den düşük kalıyor. Beklenen tıklama sayısını artırmayı veya bütçeyi kısmayı deneyin.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # TABLO
+            # TABLO (Grafik Yok, Net Kar Yok)
             st.subheader("📋 PERFORMANS ANALİZİ")
             cols = ['username', 'Niche', 'avg_views', 'CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)']
             
