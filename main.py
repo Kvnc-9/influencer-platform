@@ -104,7 +104,7 @@ if 'logged_in' not in st.session_state:
 # -----------------------------------------------------------------------------
 
 def trigger_webhook(username):
-    # SENİN MAKE.COM LİNKİN (Otomatik Eklendi) ✅
+    # SENİN MAKE.COM LİNKİN
     webhook_url = "https://hook.eu1.make.com/ixxd5cuuqkhhkpd8sqn5soiyol0a952x"
     try:
         requests.get(f"{webhook_url}?username={username}")
@@ -149,28 +149,17 @@ def get_avg_views_from_json(row):
         return 0
 
 def calculate_roi_metrics(row, ad_cost, clicks, product_price):
-    """
-    YENİ HESAPLAMA MANTIĞI:
-    1. Net Kâr = (Tıklama * Ürün Fiyatı) - Maliyet
-    2. ROI Çarpanı = Gelir / Maliyet
-    3. Brand Score = ROI performansına göre 0-100 arası puan
-    """
     views = row.get('avg_views', 0)
     
     if views <= 0:
         return pd.Series([0, 0, 0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Net Kâr ($)', 'ROI (x)', 'Brand Score'])
 
-    # CPM ve RPM (Mevcut Formüller)
+    # Hesaplamalar
     cpm = (ad_cost / views) * 1000
     total_revenue = clicks * product_price 
     rpm = (total_revenue / views) * 1000
-    
-    # YENİ: Net Kâr ve ROI
     net_profit = total_revenue - ad_cost
     roi_x = total_revenue / ad_cost if ad_cost > 0 else 0
-    
-    # YENİ: Otomatik Brand Alignment Score (Yapay Zeka yoksa matematikle üretir)
-    # ROI ne kadar yüksekse puan o kadar artar.
     brand_score = min(99, int((roi_x * 25) + 30)) 
     
     return pd.Series([cpm, rpm, net_profit, roi_x, brand_score], 
@@ -185,7 +174,6 @@ if not st.session_state['logged_in']:
     col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         st.markdown("<br><br><h1 style='text-align: center;'>🔐 GİRİŞ</h1>", unsafe_allow_html=True)
-        # Giriş Kutusunu Tasarıma Uygun Yap
         st.markdown('<div class="metric-container">', unsafe_allow_html=True)
         
         email = st.text_input("Kullanıcı Adı")
@@ -234,7 +222,7 @@ else:
     st.title("📈 Influencer ROI Simülatörü")
     st.markdown("Yapay Zeka Destekli Finansal Analiz Aracı")
     
-    # GİRDİ ALANLARI (INPUTS)
+    # GİRDİ ALANLARI
     with st.container():
         st.markdown('<div class="metric-container">', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
@@ -293,7 +281,12 @@ else:
             
             cols = ['username', 'Niche', 'avg_views', 'Brand Score', 'CPM ($)', 'RPM ($)', 'ROI (x)', 'Net Kâr ($)']
             
-            # Tablo Renklendirme
+            # Matplotlib gerektirmeyen manuel renklendirme fonksiyonu
+            def highlight_profit(val):
+                # Kâr pozitifse açık yeşil, negatifse açık kırmızı (yazı siyah olsun diye color:black ekledim)
+                color = '#d4edda' if val > 0 else '#f8d7da'
+                return f'background-color: {color}; color: black;'
+
             st.dataframe(
                 df_valid[cols].style.format({
                     "avg_views": "{:,.0f}",
@@ -302,7 +295,7 @@ else:
                     "RPM ($)": "${:.2f}",
                     "ROI (x)": "{:.2f}x",
                     "Net Kâr ($)": "${:+.2f}"
-                }).background_gradient(subset=['Net Kâr ($)'], cmap="RdYlGn"), # Kâr sütununu renklendir
+                }).applymap(highlight_profit, subset=['Net Kâr ($)']), # Matplotlib gerektirmeyen güvenli yöntem
                 use_container_width=True,
                 height=400
             )
@@ -316,17 +309,16 @@ else:
                 x="CPM ($)",      
                 y="RPM ($)",      
                 color="Niche",    
-                size="Net Kâr ($)", # Baloncuk büyüklüğü kâra göre
+                size="Net Kâr ($)", 
                 hover_name="username",
                 hover_data=["ROI (x)", "Brand Score"],
                 text="username",
                 title="Maliyet vs Gelir Analizi (Büyük Nokta = Çok Kâr)",
                 labels={"CPM ($)": "Maliyet (CPM)", "RPM ($)": "Gelir (RPM)"},
                 height=600,
-                template="plotly_dark" # Koyu Tema Grafiği
+                template="plotly_dark"
             )
             
-            # Grafik Arkaplanını Şeffaf Yap
             fig.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
@@ -334,7 +326,6 @@ else:
             )
             fig.update_traces(textposition='top center')
             
-            # Başabaş Noktası Çizgisi
             max_limit = max(df_valid['CPM ($)'].max(), df_valid['RPM ($)'].max()) * 1.1
             fig.add_shape(
                 type="line", line=dict(dash='dash', color="gray"),
