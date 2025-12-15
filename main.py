@@ -106,10 +106,14 @@ st.markdown("""
         width: 100%;
     }
     
-    /* TABLO */
+    /* TABLO DÜZENLEMELERİ (Editable tablo için) */
     .stDataFrame {
         background-color: rgba(0,0,0,0.3);
         border: 1px solid rgba(255,255,255,0.1);
+    }
+    div[data-testid="stDataEditor"] {
+        border-radius: 10px;
+        overflow: hidden;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -176,25 +180,27 @@ def get_avg_views_from_json(row):
     else:
         return 0
 
-def calculate_roi_metrics(row, ad_cost, clicks, product_price):
+def calculate_roi_metrics(row, ad_cost, product_price):
     """
-    SADE VE NET FORMÜLLER:
-    Hiçbir yapay zeka yorumu yok. Sadece matematik.
+    KİŞİYE ÖZEL HESAPLAMA:
+    Artık 'clicks' (tıklama) parametresi satırdan (row'dan) geliyor.
     """
     views = row.get('avg_views', 0)
+    # Kişiye özel girilen tıklama sayısı (Tablodan gelir)
+    clicks = row.get('Beklenen Tıklama', 0) 
     
-    # İzlenme 0 ise hata vermesin diye 0 döndür
+    # İzlenme 0 ise hata vermesin
     if views <= 0:
         return pd.Series([0, 0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
 
-    # 1. CPM (Maliyet) = (Bütçe / İzlenme) * 1000
+    # 1. CPM (Maliyet)
     cpm = (ad_cost / views) * 1000
     
-    # 2. RPM (Gelir) = (Beklenen Tıklama * Ürün Fiyatı / İzlenme) * 1000
-    # SENİN VERDİĞİN FORMÜL BURADA UYGULANDI
-    rpm = ((clicks * product_price) / views) * 1000
+    # 2. RPM (Gelir) = (O Kişiye Özel Tıklama * Ürün Fiyatı / İzlenme) * 1000
+    total_revenue = clicks * product_price
+    rpm = (total_revenue / views) * 1000
     
-    # 3. FARK (Sıralama için)
+    # 3. FARK
     diff = rpm - cpm
     
     # 4. ROI (%) = ((RPM - CPM) / CPM) * 100
@@ -282,19 +288,16 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Girdi Alanları
+    # Girdi Alanları (Global Tıklama Kaldırıldı)
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("<h4 style='margin:0; opacity:0.8;'>💸 MALİYET</h4>", unsafe_allow_html=True)
+        # Maliyet şimdilik global, ama formül kişi başı izlenmeye bölerek CPM buluyor
         ad_cost = st.number_input("Influencer Bütçesi ($)", value=1000, step=100, label_visibility="collapsed")
     
     with col2:
-        st.markdown("<h4 style='margin:0; opacity:0.8;'>🖱️ BEKLENEN TIKLAMA</h4>", unsafe_allow_html=True)
-        exp_clicks = st.number_input("Toplam Tıklama Sayısı", value=500, step=50, label_visibility="collapsed")
-    
-    with col3:
         st.markdown("<h4 style='margin:0; opacity:0.8;'>🏷️ ÜRÜN</h4>", unsafe_allow_html=True)
         prod_price = st.number_input("Ürün Fiyatı ($)", value=30.0, step=5.0, label_visibility="collapsed")
     st.markdown("</div>", unsafe_allow_html=True)
@@ -305,32 +308,66 @@ else:
     if response.data:
         df = pd.DataFrame(response.data)
         
+        # Temel Veri Hazırlığı
         if 'Niche' not in df.columns:
             if 'niche' in df.columns: df['Niche'] = df['niche']
             else: df['Niche'] = "Genel"
         df['Niche'] = df['Niche'].fillna("Genel").replace("", "Genel")
-
-        # Hesaplamalar
+        
+        # İzlenmeleri Çek
         df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
+
+        # ---------------------------------------------------------------------
+        # YENİ: KİŞİYE ÖZEL TIKLAMA GİRİŞİ (Editable Dataframe)
+        # ---------------------------------------------------------------------
+        st.markdown("### 🖱️ TIKLAMA TAHMİNLERİNİ GİRİNİZ")
+        st.info("Aşağıdaki tabloda **'Beklenen Tıklama'** sütununa her influencer için tahmininizi yazın, sonuçlar otomatik hesaplanacaktır.")
+
+        # Eğer dataframede henüz bu sütun yoksa varsayılan 500 ata
+        if 'Beklenen Tıklama' not in df.columns:
+            df['Beklenen Tıklama'] = 500
+
+        # Görüntülenecek ve Düzenlenecek Sütunlar
+        editor_cols = ['username', 'Niche', 'avg_views', 'Beklenen Tıklama']
         
-        # calculate_roi_metrics'e artık SADECE girdileri gönderiyoruz (Global ortalama vs yok)
-        metrics = df.apply(calculate_roi_metrics, args=(ad_cost, exp_clicks, prod_price), axis=1)
-        df = pd.concat([df, metrics], axis=1)
+        # st.data_editor ile düzenlenebilir tablo oluşturuyoruz
+        edited_df = st.data_editor(
+            df[editor_cols],
+            column_config={
+                "username": st.column_config.TextColumn("Kullanıcı Adı", disabled=True),
+                "Niche": st.column_config.TextColumn("Kategori", disabled=True),
+                "avg_views": st.column_config.NumberColumn("Ort. İzlenme", disabled=True, format="%d"),
+                "Beklenen Tıklama": st.column_config.NumberColumn("Beklenen Tıklama (Adet)", min_value=0, step=10, required=True)
+            },
+            hide_index=True,
+            use_container_width=True,
+            num_rows="fixed"
+        )
+
+        # ---------------------------------------------------------------------
+        # HESAPLAMA (Düzenlenmiş veriyi kullanarak)
+        # ---------------------------------------------------------------------
+        # calculate_roi_metrics fonksiyonuna artık edited_df'deki satırları gönderiyoruz
+        metrics = edited_df.apply(calculate_roi_metrics, args=(ad_cost, prod_price), axis=1)
         
-        df_valid = df[df['avg_views'] > 0].copy()
+        # Sonuçları ana tabloyla birleştir
+        results_df = pd.concat([edited_df, metrics], axis=1)
+        
+        # Geçerli verileri filtrele (İzlenmesi olanlar)
+        df_valid = results_df[results_df['avg_views'] > 0].copy()
         
         if not df_valid.empty:
-            # Sıralamayı (RPM - CPM) Farkına göre yap (En çok kar bırakan)
+            # Sıralamayı (RPM - CPM) Farkına göre yap
             df_valid = df_valid.sort_values(by="Fark ($)", ascending=False)
             
             # KAZANAN KARTI
             winner = df_valid.iloc[0]
-            # Fark pozitifse (RPM > CPM) kazanandır
             if winner['Fark ($)'] > 0:
                 st.markdown(f"""
-                <div class='glass-card' style='border-left: 5px solid #38ef7d; background: rgba(17, 153, 142, 0.2);'>
+                <div class='glass-card' style='border-left: 5px solid #38ef7d; background: rgba(17, 153, 142, 0.2); margin-top: 20px;'>
                     <h2 style='font-family:Oswald; color:#38ef7d; margin:0;'>🏆 TAVSİYE EDİLEN: {winner['username']}</h2>
                     <p style='font-size: 1.2rem; margin-top:10px;'>
+                        Girdiğiniz <b>{winner['Beklenen Tıklama']}</b> tıklama tahmini ile: <br>
                         ROI: <b style='color:white'>{winner['ROI (%)']:.1f}%</b> &nbsp;|&nbsp; 
                         RPM-CPM Farkı: <b style='color:white'>${winner['Fark ($)']:,.2f}</b>
                     </p>
@@ -338,17 +375,16 @@ else:
                 """, unsafe_allow_html=True)
             else:
                 st.markdown("""
-                <div class='glass-card' style='border-left: 5px solid #ff4b1f; background: rgba(255, 75, 31, 0.1);'>
+                <div class='glass-card' style='border-left: 5px solid #ff4b1f; background: rgba(255, 75, 31, 0.1); margin-top: 20px;'>
                     <h3 style='color:#ff4b1f; margin:0;'>⚠️ Kârlı Senaryo Bulunamadı</h3>
-                    <p>RPM değerleri CPM'den düşük kalıyor. Beklenen tıklama sayısını artırmayı veya bütçeyi kısmayı deneyin.</p>
+                    <p>Girdiğiniz tıklama değerlerine göre RPM, maliyeti (CPM) karşılamıyor.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # TABLO (Grafik Yok, Net Kar Yok)
-            st.subheader("📋 PERFORMANS ANALİZİ")
-            cols = ['username', 'Niche', 'avg_views', 'CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)']
+            # SONUÇ TABLOSU
+            st.subheader("📋 SONUÇ RAPORU")
+            cols = ['username', 'avg_views', 'Beklenen Tıklama', 'CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)']
             
-            # Güvenli renklendirme (Hatasız)
             def safe_highlight(val):
                 try:
                     if isinstance(val, str): return ''
@@ -359,6 +395,7 @@ else:
             st.dataframe(
                 df_valid[cols].style.format({
                     "avg_views": "{:,.0f}",
+                    "Beklenen Tıklama": "{:,.0f}",
                     "CPM ($)": "${:.2f}",
                     "RPM ($)": "${:.2f}",
                     "Fark ($)": "${:+.2f}",
