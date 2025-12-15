@@ -204,10 +204,10 @@ def calculate_roi_metrics(row, ad_cost, product_price):
     diff = rpm - cpm
     
     # 4. ROI (%) = ((RPM - CPM) / CPM) * 100
-    if cpm > 0:
-        roi_percent = ((rpm - cpm) / cpm) * 100
+    if olasi_gelir != 0:
+        roi = ((influencer_ucreti - olasi_gelir) / olasi_gelir) * 100
     else:
-        roi_percent = 0
+        roi = 0 # Sıfıra bölünme hatasını önlemek için
     
     return pd.Series([cpm, rpm, diff, roi_percent], 
                      index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
