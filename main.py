@@ -1,22 +1,20 @@
 import streamlit as st
 from supabase import create_client
 import pandas as pd
-import plotly.express as px
 import requests
 import json
 import time
 
 # -----------------------------------------------------------------------------
-# 1. AYARLAR VE GÖRSEL TASARIM (YENİLENEN KISIM 🎨)
+# 1. AYARLAR VE GÖRSEL TASARIM (AYNI KALDI 🎨)
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Influencer ROI Analizi", layout="wide", page_icon="🟣")
 
-# SANA ÖZEL TASARIM KODLARI (Görseldeki Temaya Uygun)
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
 
-    /* 1. ARKA PLAN: Görseldeki Mor-Pembe-Turuncu Akışkan Geçiş */
+    /* ARKA PLAN */
     .stApp {
         background: linear-gradient(120deg, #180529 0%, #3a0ca3 25%, #f72585 60%, #ff9e00 100%);
         background-attachment: fixed;
@@ -32,9 +30,9 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
 
-    /* 2. SIDEBAR: Sol Menü (Görseldeki Koyu Dikey Bar) */
+    /* SIDEBAR */
     section[data-testid="stSidebar"] {
-        background-color: #120524; /* Çok koyu mor/siyah */
+        background-color: #120524;
         border-right: 1px solid rgba(255, 255, 255, 0.05);
     }
     section[data-testid="stSidebar"] h1, label, .stMarkdown {
@@ -43,50 +41,35 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* 3. INPUT ALANLARI: Şeffaf ve Altı Çizgili (Modern) */
+    /* INPUT ALANLARI */
     div[data-baseweb="input"] {
         background-color: rgba(255, 255, 255, 0.05) !important;
         border: none !important;
         border-bottom: 2px solid rgba(255, 255, 255, 0.3) !important;
         border-radius: 4px !important;
         color: white !important;
-        transition: all 0.3s ease;
-    }
-    div[data-baseweb="input"]:focus-within {
-        border-bottom: 2px solid #ff9e00 !important; /* Turuncu vurgu */
-        background-color: rgba(255, 255, 255, 0.1) !important;
     }
     input { color: white !important; }
-    div[data-testid="stNumberInput"] label, div[data-testid="stTextInput"] label {
-        color: rgba(255,255,255,0.7) !important;
-        font-size: 0.9rem;
-        text-transform: uppercase;
-    }
 
-    /* 4. METRİK KARTLARI: Glassmorphism (Görseldeki 02, 03 kartları gibi) */
+    /* CAM KARTLAR */
     .glass-card {
         background: rgba(0, 0, 0, 0.4);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 0px; /* Keskin köşeler görseldeki gibi */
         padding: 30px;
         margin-bottom: 20px;
         position: relative;
         overflow: hidden;
     }
-    /* Kartların üzerine dekoratif numara efekti */
     .glass-card::before {
         content: '';
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 4px;
-        height: 100%;
+        top: 0; left: 0; width: 4px; height: 100%;
         background: linear-gradient(to bottom, #f72585, #ff9e00);
     }
 
-    /* 5. BAŞLIKLAR: Görseldeki Büyük Tipografi */
+    /* BAŞLIKLAR */
     h1.hero-title {
         font-family: 'Oswald', sans-serif;
         font-size: 5rem;
@@ -109,45 +92,24 @@ st.markdown("""
         text-transform: uppercase;
     }
 
-    /* 6. BUTONLAR: Görseldeki Turuncu/Pembe Butonlar */
+    /* BUTONLAR */
     div.stButton > button {
-        background: linear-gradient(90deg, #ff7e5f, #feb47b); /* Turuncu geçiş */
+        background: linear-gradient(90deg, #ff7e5f, #feb47b);
         color: white;
         border: none;
-        border-radius: 0px; /* Keskin köşe */
         padding: 12px 35px;
         font-family: 'Oswald', sans-serif;
         font-size: 16px;
         letter-spacing: 1px;
         text-transform: uppercase;
         box-shadow: 0 4px 15px rgba(255, 126, 95, 0.4);
-        transition: transform 0.2s;
         width: 100%;
     }
-    div.stButton > button:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(255, 126, 95, 0.6);
-        color: white;
-    }
     
-    /* İkincil Butonlar (Silme vs.) */
-    div.stButton > button[kind="secondary"] {
-        background: transparent;
-        border: 1px solid rgba(255,255,255,0.3);
-    }
-
-    /* 7. TABLO ve GRAFİK */
-    .stDataFrame, .stPlotlyChart {
+    /* TABLO */
+    .stDataFrame {
         background-color: rgba(0,0,0,0.3);
         border: 1px solid rgba(255,255,255,0.1);
-    }
-    
-    /* Login Ekranı Ortalaması */
-    .login-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 80vh;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -170,7 +132,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 
 # -----------------------------------------------------------------------------
-# 2. FONKSİYONLAR (MEVCUT LOJİK KORUNDU)
+# 2. FONKSİYONLAR
 # -----------------------------------------------------------------------------
 
 def trigger_webhook(username):
@@ -215,39 +177,55 @@ def get_avg_views_from_json(row):
         return 0
 
 def calculate_roi_metrics(row, ad_cost, clicks, product_price, global_avg_views):
+    """
+    YENİ HESAPLAMA MANTIĞI:
+    ROI = ((RPM - CPM) / CPM) * 100
+    Sıralama: RPM ve CPM arasındaki Fark ($)
+    """
     views = row.get('avg_views', 0)
     niche = row.get('Niche', 'Genel')
     
     if views <= 0:
-        return pd.Series([0, 0, 0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Net Kâr ($)', 'ROI (x)', 'Brand Score'])
+        return pd.Series([0, 0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
 
+    # Niche Çarpanları
     niche_weights = {
         'Tech': 1.3, 'Business': 1.3, 'Finance': 1.4, 'Fashion': 1.2,
         'Beauty': 1.2, 'Gaming': 1.1, 'Travel': 1.0, 'Food': 0.9,
         'General': 0.8, 'Comedy': 0.8
     }
     niche_multiplier = niche_weights.get(niche, 1.0)
+    
+    # Dinamik Tıklama Tahmini (İzlenmeye göre ölçekle)
     view_performance_ratio = views / global_avg_views if global_avg_views > 0 else 1
     estimated_clicks = clicks * view_performance_ratio * niche_multiplier
     
+    # 1. CPM (Maliyet)
     cpm = (ad_cost / views) * 1000
+    
+    # 2. RPM (Gelir)
     estimated_revenue = estimated_clicks * product_price
     rpm = (estimated_revenue / views) * 1000
-    net_profit = estimated_revenue - ad_cost
-    roi_x = estimated_revenue / ad_cost if ad_cost > 0 else 0
-    raw_score = (roi_x * 20) + (niche_multiplier * 20)
-    brand_score = min(99, max(1, int(raw_score)))
     
-    return pd.Series([cpm, rpm, net_profit, roi_x, brand_score], 
-                     index=['CPM ($)', 'RPM ($)', 'Net Kâr ($)', 'ROI (x)', 'Brand Score'])
+    # 3. FARK (Sıralama Kriteri)
+    diff = rpm - cpm
+    
+    # 4. ROI HESABI (İstediğin Formül)
+    # ROI = ((RPM - CPM) / CPM) * 100
+    if cpm > 0:
+        roi_percent = ((rpm - cpm) / cpm) * 100
+    else:
+        roi_percent = 0
+    
+    return pd.Series([cpm, rpm, diff, roi_percent], 
+                     index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
 
 # -----------------------------------------------------------------------------
-# 3. ARAYÜZ (YENİ TASARIMLI LAYOUT)
+# 3. ARAYÜZ
 # -----------------------------------------------------------------------------
 
-# --- GİRİŞ PANELİ (Login) ---
+# --- GİRİŞ PANELİ ---
 if not st.session_state['logged_in']:
-    # Görseldeki gibi şık bir giriş kutusu
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
@@ -311,7 +289,6 @@ else:
 
     # --- ANA EKRAN İÇERİĞİ ---
     
-    # Header Bölümü (Görseldeki "WEB DESIGN" yazısı stili)
     st.markdown("""
         <div>
             <h1 class='hero-title'>ROI ANALİZ</h1>
@@ -319,7 +296,7 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Girdi Alanları (Görseldeki kartlar gibi yan yana ve şık)
+    # Girdi Alanları
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns(3)
     
@@ -358,18 +335,19 @@ else:
         df_valid = df[df['avg_views'] > 0].copy()
         
         if not df_valid.empty:
-            df_valid = df_valid.sort_values(by="Net Kâr ($)", ascending=False)
+            # Sıralamayı (RPM - CPM) Farkına göre yap
+            df_valid = df_valid.sort_values(by="Fark ($)", ascending=False)
             
-            # KAZANAN KARTI (Büyük ve Renkli)
+            # KAZANAN KARTI
             winner = df_valid.iloc[0]
-            if winner['Net Kâr ($)'] > 0:
+            # Fark pozitifse (RPM > CPM) kazanandır
+            if winner['Fark ($)'] > 0:
                 st.markdown(f"""
                 <div class='glass-card' style='border-left: 5px solid #38ef7d; background: rgba(17, 153, 142, 0.2);'>
                     <h2 style='font-family:Oswald; color:#38ef7d; margin:0;'>🏆 TAVSİYE EDİLEN: {winner['username']}</h2>
                     <p style='font-size: 1.2rem; margin-top:10px;'>
-                        Tahmini Kâr: <b style='color:white'>${winner['Net Kâr ($)']:,.0f}</b> &nbsp;|&nbsp; 
-                        ROI: <b style='color:white'>{winner['ROI (x)']:.1f}x</b> &nbsp;|&nbsp; 
-                        Skor: <b style='color:white'>{winner['Brand Score']:.0f}/100</b>
+                        ROI: <b style='color:white'>{winner['ROI (%)']:.1f}%</b> &nbsp;|&nbsp; 
+                        RPM-CPM Farkı: <b style='color:white'>${winner['Fark ($)']:,.2f}</b>
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -377,56 +355,34 @@ else:
                 st.markdown("""
                 <div class='glass-card' style='border-left: 5px solid #ff4b1f; background: rgba(255, 75, 31, 0.1);'>
                     <h3 style='color:#ff4b1f; margin:0;'>⚠️ Kârlı Senaryo Bulunamadı</h3>
-                    <p>Bütçeyi düşürmeyi veya tıklama beklentisini artırmayı deneyin.</p>
+                    <p>RPM değerleri CPM'den düşük kalıyor. Bütçeyi düşürmeyi deneyin.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
-            # TABLO ve GRAFİK YAN YANA (Daha kompakt görünüm)
-            c_tablo, c_grafik = st.columns([1, 1])
+            # TABLO
+            st.subheader("📋 PERFORMANS ANALİZİ")
+            cols = ['username', 'Niche', 'avg_views', 'CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)']
             
-            with c_tablo:
-                st.subheader("📋 ANALİZ TABLOSU")
-                cols = ['username', 'Niche', 'avg_views', 'ROI (x)', 'Net Kâr ($)']
-                
-                # Basit güvenli renklendirme
-                def safe_highlight(val):
-                    try:
-                        if isinstance(val, str): return ''
-                        color = 'rgba(56, 239, 125, 0.2)' if val > 0 else 'rgba(255, 75, 31, 0.2)'
-                        return f'background-color: {color}; color: white;'
-                    except: return ''
+            # Güvenli renklendirme (Hatasız)
+            def safe_highlight(val):
+                try:
+                    if isinstance(val, str): return ''
+                    color = 'rgba(56, 239, 125, 0.2)' if val > 0 else 'rgba(255, 75, 31, 0.2)'
+                    return f'background-color: {color}; color: white;'
+                except: return ''
 
-                st.dataframe(
-                    df_valid[cols].style.format({
-                        "avg_views": "{:,.0f}",
-                        "ROI (x)": "{:.2f}x",
-                        "Net Kâr ($)": "${:+.2f}"
-                    }).applymap(safe_highlight, subset=['Net Kâr ($)']),
-                    use_container_width=True,
-                    height=500
-                )
+            st.dataframe(
+                df_valid[cols].style.format({
+                    "avg_views": "{:,.0f}",
+                    "CPM ($)": "${:.2f}",
+                    "RPM ($)": "${:.2f}",
+                    "Fark ($)": "${:+.2f}",
+                    "ROI (%)": "{:.2f}%"
+                }).applymap(safe_highlight, subset=['Fark ($)']),
+                use_container_width=True,
+                height=500
+            )
 
-            with c_grafik:
-                st.subheader("📊 GRAFİKSEL DAĞILIM")
-                fig = px.scatter(
-                    df_valid,
-                    x="CPM ($)", y="RPM ($)",
-                    color="Niche", size="Net Kâr ($)",
-                    hover_name="username",
-                    text="username",
-                    template="plotly_dark",
-                    height=500
-                )
-                fig.update_layout(
-                    paper_bgcolor='rgba(0,0,0,0)',
-                    plot_bgcolor='rgba(0,0,0,0)',
-                    font=dict(color="white"),
-                    xaxis=dict(showgrid=False),
-                    yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.1)')
-                )
-                fig.update_traces(textposition='top center')
-                st.plotly_chart(fig, use_container_width=True)
-            
         else:
             st.warning("Veri var ama videolu gönderi yok.")
     else:
