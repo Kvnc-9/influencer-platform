@@ -207,7 +207,7 @@ def calculate_roi_metrics(row, ad_cost, product_price):
     # Formül: ((Maliyet - Gelir) / Gelir) * 100
     # Matematik: ((ad_cost - total_revenue) / total_revenue) * 100
     if total_revenue > 0:
-        roi_percent = ((ad_cost - total_revenue) / total_revenue) * 100
+        roi_percent = ((total_revenue - ad_cost ) / ad_cost ) * 100
     else:
         roi_percent = 0 # Gelir 0 ise sıfıra bölünme hatası olmasın
     
