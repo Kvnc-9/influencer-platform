@@ -6,7 +6,7 @@ import json
 import time
 
 # -----------------------------------------------------------------------------
-# 1. AYARLAR VE GÖRSEL TASARIM (AYNI KALDI 🎨)
+# 1. AYARLAR VE GÖRSEL TASARIM
 # -----------------------------------------------------------------------------
 st.set_page_config(page_title="Influencer ROI Analizi", layout="wide", page_icon="🟣")
 
@@ -182,32 +182,34 @@ def get_avg_views_from_json(row):
 
 def calculate_roi_metrics(row, ad_cost, product_price):
     """
-    KİŞİYE ÖZEL HESAPLAMA:
-    Artık 'clicks' (tıklama) parametresi satırdan (row'dan) geliyor.
+    KİŞİYE ÖZEL HESAPLAMA (GÜNCELLENMİŞ ROI FORMÜLÜ)
     """
     views = row.get('avg_views', 0)
-    # Kişiye özel girilen tıklama sayısı (Tablodan gelir)
     clicks = row.get('Beklenen Tıklama', 0) 
     
     # İzlenme 0 ise hata vermesin
     if views <= 0:
         return pd.Series([0, 0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
 
-    # 1. CPM (Maliyet)
+    # 1. CPM (Maliyet / 1000 izlenme)
     cpm = (ad_cost / views) * 1000
     
-    # 2. RPM (Gelir) = (O Kişiye Özel Tıklama * Ürün Fiyatı / İzlenme) * 1000
+    # 2. Gelir Hesapla: (Tıklanma x Ürün Fiyatı)
     total_revenue = clicks * product_price
+    
+    # RPM (Gelir / 1000 izlenme) - Tabloda bilgi amaçlı durabilir
     rpm = (total_revenue / views) * 1000
     
-    # 3. FARK
+    # 3. FARK (RPM - CPM) -> Kârlılık sıralaması için kullanılır
     diff = rpm - cpm
     
-    # 4. ROI (%) = ((RPM - CPM) / CPM) * 100
-    if olasi_gelir != 0:
-        roi = ((influencer_ucreti - olasi_gelir) / olasi_gelir) * 100
+    # 4. ROI (%) -> SENİN İSTEDİĞİN ÖZEL FORMÜL
+    # Formül: ((Maliyet - Gelir) / Gelir) * 100
+    # Matematik: ((ad_cost - total_revenue) / total_revenue) * 100
+    if total_revenue > 0:
+        roi_percent = ((ad_cost - total_revenue) / total_revenue) * 100
     else:
-        roi = 0 # Sıfıra bölünme hatasını önlemek için
+        roi_percent = 0 # Gelir 0 ise sıfıra bölünme hatası olmasın
     
     return pd.Series([cpm, rpm, diff, roi_percent], 
                      index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
@@ -288,13 +290,12 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Girdi Alanları (Global Tıklama Kaldırıldı)
+    # Girdi Alanları
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("<h4 style='margin:0; opacity:0.8;'>💸 MALİYET</h4>", unsafe_allow_html=True)
-        # Maliyet şimdilik global, ama formül kişi başı izlenmeye bölerek CPM buluyor
         ad_cost = st.number_input("Influencer Bütçesi ($)", value=1000, step=100, label_visibility="collapsed")
     
     with col2:
@@ -318,19 +319,17 @@ else:
         df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
 
         # ---------------------------------------------------------------------
-        # YENİ: KİŞİYE ÖZEL TIKLAMA GİRİŞİ (Editable Dataframe)
+        # KİŞİYE ÖZEL TIKLAMA GİRİŞİ (Editable Dataframe)
         # ---------------------------------------------------------------------
         st.markdown("### 🖱️ TIKLAMA TAHMİNLERİNİ GİRİNİZ")
         st.info("Aşağıdaki tabloda **'Beklenen Tıklama'** sütununa her influencer için tahmininizi yazın, sonuçlar otomatik hesaplanacaktır.")
 
-        # Eğer dataframede henüz bu sütun yoksa varsayılan 500 ata
         if 'Beklenen Tıklama' not in df.columns:
             df['Beklenen Tıklama'] = 500
 
         # Görüntülenecek ve Düzenlenecek Sütunlar
         editor_cols = ['username', 'Niche', 'avg_views', 'Beklenen Tıklama']
         
-        # st.data_editor ile düzenlenebilir tablo oluşturuyoruz
         edited_df = st.data_editor(
             df[editor_cols],
             column_config={
@@ -347,17 +346,16 @@ else:
         # ---------------------------------------------------------------------
         # HESAPLAMA (Düzenlenmiş veriyi kullanarak)
         # ---------------------------------------------------------------------
-        # calculate_roi_metrics fonksiyonuna artık edited_df'deki satırları gönderiyoruz
         metrics = edited_df.apply(calculate_roi_metrics, args=(ad_cost, prod_price), axis=1)
         
-        # Sonuçları ana tabloyla birleştir
+        # Sonuçları birleştir
         results_df = pd.concat([edited_df, metrics], axis=1)
         
-        # Geçerli verileri filtrele (İzlenmesi olanlar)
+        # Geçerli verileri filtrele
         df_valid = results_df[results_df['avg_views'] > 0].copy()
         
         if not df_valid.empty:
-            # Sıralamayı (RPM - CPM) Farkına göre yap
+            # Sıralamayı (RPM - CPM) Farkına göre yap (Hala en yüksek kârı getiren üstte kalsın)
             df_valid = df_valid.sort_values(by="Fark ($)", ascending=False)
             
             # KAZANAN KARTI
@@ -368,8 +366,8 @@ else:
                     <h2 style='font-family:Oswald; color:#38ef7d; margin:0;'>🏆 TAVSİYE EDİLEN: {winner['username']}</h2>
                     <p style='font-size: 1.2rem; margin-top:10px;'>
                         Girdiğiniz <b>{winner['Beklenen Tıklama']}</b> tıklama tahmini ile: <br>
-                        ROI: <b style='color:white'>{winner['ROI (%)']:.1f}%</b> &nbsp;|&nbsp; 
-                        RPM-CPM Farkı: <b style='color:white'>${winner['Fark ($)']:,.2f}</b>
+                        ROI (Maliyet/Gelir Oranı): <b style='color:white'>{winner['ROI (%)']:.1f}%</b> &nbsp;|&nbsp; 
+                        Net Kâr: <b style='color:white'>${winner['Fark ($)'] * (winner['avg_views']/1000):,.2f}</b>
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -377,7 +375,7 @@ else:
                 st.markdown("""
                 <div class='glass-card' style='border-left: 5px solid #ff4b1f; background: rgba(255, 75, 31, 0.1); margin-top: 20px;'>
                     <h3 style='color:#ff4b1f; margin:0;'>⚠️ Kârlı Senaryo Bulunamadı</h3>
-                    <p>Girdiğiniz tıklama değerlerine göre RPM, maliyeti (CPM) karşılamıyor.</p>
+                    <p>Girdiğiniz tıklama değerlerine göre gelir, maliyeti karşılamıyor.</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -388,6 +386,7 @@ else:
             def safe_highlight(val):
                 try:
                     if isinstance(val, str): return ''
+                    # Fark pozitifse (Kâr varsa) yeşil, yoksa kırmızı
                     color = 'rgba(56, 239, 125, 0.2)' if val > 0 else 'rgba(255, 75, 31, 0.2)'
                     return f'background-color: {color}; color: white;'
                 except: return ''
