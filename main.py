@@ -106,7 +106,7 @@ st.markdown("""
         width: 100%;
     }
     
-    /* TABLO DÜZENLEMELERİ (Editable tablo için) */
+    /* TABLO DÜZENLEMELERİ */
     .stDataFrame {
         background-color: rgba(0,0,0,0.3);
         border: 1px solid rgba(255,255,255,0.1);
@@ -187,7 +187,6 @@ def calculate_roi_metrics(row, ad_cost, product_price):
     views = row.get('avg_views', 0)
     clicks = row.get('Beklenen Tıklama', 0) 
     
-    # İzlenme 0 ise hata vermesin
     if views <= 0:
         return pd.Series([0, 0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
 
@@ -197,19 +196,18 @@ def calculate_roi_metrics(row, ad_cost, product_price):
     # 2. Gelir Hesapla: (Tıklanma x Ürün Fiyatı)
     total_revenue = clicks * product_price
     
-    # RPM (Gelir / 1000 izlenme) - Tabloda bilgi amaçlı durabilir
+    # RPM (Gelir / 1000 izlenme)
     rpm = (total_revenue / views) * 1000
     
-    # 3. FARK (RPM - CPM) -> Kârlılık sıralaması için kullanılır
+    # 3. FARK (RPM - CPM)
     diff = rpm - cpm
     
-    # 4. ROI (%) -> SENİN İSTEDİĞİN ÖZEL FORMÜL
+    # 4. ROI (%) -> ÖZEL FORMÜL
     # Formül: ((Maliyet - Gelir) / Gelir) * 100
-    # Matematik: ((ad_cost - total_revenue) / total_revenue) * 100
     if total_revenue > 0:
         roi_percent = ((ad_cost - total_revenue) / total_revenue) * 100
     else:
-        roi_percent = 0 # Gelir 0 ise sıfıra bölünme hatası olmasın
+        roi_percent = 0
     
     return pd.Series([cpm, rpm, diff, roi_percent], 
                      index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
@@ -276,6 +274,29 @@ else:
                 time.sleep(1)
                 st.rerun()
         
+        # --- 3. ADIM: BEHIND THE CURTAIN ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        with st.expander("🕵️ BEHIND THE CURTAIN"):
+            st.markdown("""
+            <div style='font-size:0.85rem; color:#e0e0e0;'>
+                <b>HESAPLAMA MANTIĞI:</b>
+                <hr style='margin:5px 0; border-color:rgba(255,255,255,0.1);'>
+                
+                <p><b>1. CPM (Maliyet):</b><br>
+                1000 izlenme başına düşen maliyettir.<br>
+                <code>(Bütçe / İzlenme) * 1000</code></p>
+                
+                <p><b>2. RPM (Gelir):</b><br>
+                1000 izlenme başına üretilen tahmini gelirdir.<br>
+                <code>(Tıklama x Fiyat / İzlenme) * 1000</code></p>
+                
+                <p><b>3. ROI (Özel Formül):</b><br>
+                Yatırımın maliyet/gelir dengesini ölçer.<br>
+                <code>((Maliyet - Gelir) / Gelir) * 100</code><br>
+                <i style='color:#ff9e00'>*Negatif sonuç kârı, Pozitif sonuç zararı gösterir.</i></p>
+            </div>
+            """, unsafe_allow_html=True)
+            
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("ÇIKIŞ YAP", use_container_width=True):
             st.session_state['logged_in'] = False
@@ -290,17 +311,19 @@ else:
         </div>
     """, unsafe_allow_html=True)
 
-    # Girdi Alanları
+    # --- 1. ADIM: GİRDİ ALANLARINI DÜZENLEME ---
     st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("<h4 style='margin:0; opacity:0.8;'>💸 MALİYET</h4>", unsafe_allow_html=True)
-        ad_cost = st.number_input("Influencer Bütçesi ($)", value=1000, step=100, label_visibility="collapsed")
+        st.markdown("<h4 style='margin:0; opacity:0.9; font-size:1.2rem;'>💸 INFLUENCER'A ÖDENECEK TUTAR ($)</h4>", unsafe_allow_html=True)
+        st.caption("Anlaşma sağlanan influencer'a ödenecek toplam net ücreti giriniz.")
+        ad_cost = st.number_input("Influencer Bütçesi", value=1000, step=100, label_visibility="collapsed")
     
     with col2:
-        st.markdown("<h4 style='margin:0; opacity:0.8;'>🏷️ ÜRÜN</h4>", unsafe_allow_html=True)
-        prod_price = st.number_input("Ürün Fiyatı ($)", value=30.0, step=5.0, label_visibility="collapsed")
+        st.markdown("<h4 style='margin:0; opacity:0.9; font-size:1.2rem;'>🏷️ ÜRÜNÜN SATIŞ FİYATI ($)</h4>", unsafe_allow_html=True)
+        st.caption("Reklamı yapılan ürünün birim satış fiyatını (KDV dahil) giriniz.")
+        prod_price = st.number_input("Ürün Fiyatı", value=30.0, step=5.0, label_visibility="collapsed")
     st.markdown("</div>", unsafe_allow_html=True)
 
     # Veri İşleme
@@ -344,40 +367,20 @@ else:
         )
 
         # ---------------------------------------------------------------------
-        # HESAPLAMA (Düzenlenmiş veriyi kullanarak)
+        # HESAPLAMA
         # ---------------------------------------------------------------------
         metrics = edited_df.apply(calculate_roi_metrics, args=(ad_cost, prod_price), axis=1)
-        
-        # Sonuçları birleştir
         results_df = pd.concat([edited_df, metrics], axis=1)
         
         # Geçerli verileri filtrele
         df_valid = results_df[results_df['avg_views'] > 0].copy()
         
         if not df_valid.empty:
-            # Sıralamayı (RPM - CPM) Farkına göre yap (Hala en yüksek kârı getiren üstte kalsın)
+            # Sıralamayı (RPM - CPM) Farkına göre yap
             df_valid = df_valid.sort_values(by="Fark ($)", ascending=False)
             
-            # KAZANAN KARTI
-            winner = df_valid.iloc[0]
-            if winner['Fark ($)'] > 0:
-                st.markdown(f"""
-                <div class='glass-card' style='border-left: 5px solid #38ef7d; background: rgba(17, 153, 142, 0.2); margin-top: 20px;'>
-                    <h2 style='font-family:Oswald; color:#38ef7d; margin:0;'>🏆 TAVSİYE EDİLEN: {winner['username']}</h2>
-                    <p style='font-size: 1.2rem; margin-top:10px;'>
-                        Girdiğiniz <b>{winner['Beklenen Tıklama']}</b> tıklama tahmini ile: <br>
-                        ROI (Maliyet/Gelir Oranı): <b style='color:white'>{winner['ROI (%)']:.1f}%</b> &nbsp;|&nbsp; 
-                        Net Kâr: <b style='color:white'>${winner['Fark ($)'] * (winner['avg_views']/1000):,.2f}</b>
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown("""
-                <div class='glass-card' style='border-left: 5px solid #ff4b1f; background: rgba(255, 75, 31, 0.1); margin-top: 20px;'>
-                    <h3 style='color:#ff4b1f; margin:0;'>⚠️ Kârlı Senaryo Bulunamadı</h3>
-                    <p>Girdiğiniz tıklama değerlerine göre gelir, maliyeti karşılamıyor.</p>
-                </div>
-                """, unsafe_allow_html=True)
+            # --- 2. ADIM: TAVSİYE KUTUSU KALDIRILDI ---
+            # Burada artık doğrudan tablo gösteriliyor.
 
             # SONUÇ TABLOSU
             st.subheader("📋 SONUÇ RAPORU")
