@@ -4,161 +4,262 @@ import pandas as pd
 import requests
 import json
 import time
+from datetime import datetime
 
-# -----------------------------------------------------------------------------
-# 1. AYARLAR VE GÖRSEL TASARIM
-# -----------------------------------------------------------------------------
-st.set_page_config(page_title="Influencer ROI Analizi", layout="wide", page_icon="🟣")
+# =============================================================================
+# SAYFA YAPISI VE TASARIM
+# =============================================================================
+st.set_page_config(
+    page_title="Influencer ROI Analizi", 
+    layout="wide", 
+    page_icon="🎯",
+    initial_sidebar_state="expanded"
+)
 
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Roboto:wght@300;400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
+
+    * {
+        font-family: 'Inter', sans-serif;
+    }
 
     /* ARKA PLAN */
     .stApp {
-        background: linear-gradient(120deg, #180529 0%, #3a0ca3 25%, #f72585 60%, #ff9e00 100%);
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         background-attachment: fixed;
-        background-size: 200% 200%;
-        animation: gradientBG 15s ease infinite;
-        color: white;
-        font-family: 'Roboto', sans-serif;
     }
     
-    @keyframes gradientBG {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-
     /* SIDEBAR */
     section[data-testid="stSidebar"] {
-        background-color: #120524;
-        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
     }
-    section[data-testid="stSidebar"] h1, label, .stMarkdown {
+    section[data-testid="stSidebar"] * {
         color: #e0e0e0 !important;
-        font-family: 'Oswald', sans-serif;
-        letter-spacing: 1px;
     }
 
-    /* INPUT ALANLARI */
-    div[data-baseweb="input"] {
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        border: none !important;
-        border-bottom: 2px solid rgba(255, 255, 255, 0.3) !important;
-        border-radius: 4px !important;
-        color: white !important;
-    }
-    input { color: white !important; }
-
-    /* CAM KARTLAR */
-    .glass-card {
-        background: rgba(0, 0, 0, 0.4);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        padding: 30px;
+    /* MODERN KARTLAR */
+    .metric-card {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        padding: 24px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
         margin-bottom: 20px;
-        position: relative;
-        overflow: hidden;
+        transition: transform 0.3s ease;
     }
-    .glass-card::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; width: 4px; height: 100%;
-        background: linear-gradient(to bottom, #f72585, #ff9e00);
+    
+    .metric-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.15);
     }
 
     /* BAŞLIKLAR */
-    h1.hero-title {
-        font-family: 'Oswald', sans-serif;
-        font-size: 5rem;
-        font-weight: 700;
-        line-height: 1.1;
-        text-transform: uppercase;
-        background: -webkit-linear-gradient(top, #ffffff, #a0a0a0);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 0px;
+    .main-title {
+        font-size: 3.5rem;
+        font-weight: 800;
+        color: white;
+        text-align: center;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
-    h3.subtitle {
-        font-family: 'Roboto', sans-serif;
+    
+    .subtitle {
+        font-size: 1.2rem;
         font-weight: 300;
-        font-size: 1.5rem;
-        color: #ff9e00;
-        letter-spacing: 4px;
-        margin-top: -10px;
+        color: rgba(255,255,255,0.9);
+        text-align: center;
         margin-bottom: 40px;
-        text-transform: uppercase;
+    }
+
+    /* INPUT ALANLARI */
+    .stTextInput > div > div > input,
+    .stNumberInput > div > div > input {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border: 2px solid rgba(255, 255, 255, 0.3) !important;
+        border-radius: 12px !important;
+        color: white !important;
+        padding: 12px 16px !important;
+        font-size: 16px !important;
+    }
+    
+    .stTextInput > div > div > input:focus,
+    .stNumberInput > div > div > input:focus {
+        border-color: #764ba2 !important;
+        box-shadow: 0 0 0 3px rgba(118, 75, 162, 0.2) !important;
     }
 
     /* BUTONLAR */
-    div.stButton > button {
-        background: linear-gradient(90deg, #ff7e5f, #feb47b);
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         border: none;
-        padding: 12px 35px;
-        font-family: 'Oswald', sans-serif;
+        border-radius: 12px;
+        padding: 14px 32px;
+        font-weight: 600;
         font-size: 16px;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        box-shadow: 0 4px 15px rgba(255, 126, 95, 0.4);
+        letter-spacing: 0.5px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(118, 75, 162, 0.4);
         width: 100%;
     }
     
-    /* TABLO DÜZENLEMELERİ */
-    .stDataFrame {
-        background-color: rgba(0,0,0,0.3);
-        border: 1px solid rgba(255,255,255,0.1);
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(118, 75, 162, 0.6);
     }
-    div[data-testid="stDataEditor"] {
-        border-radius: 10px;
+
+    /* TABLOLAR */
+    .stDataFrame {
+        border-radius: 12px;
         overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    /* STEP INDICATOR */
+    .step-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 30px 0;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 16px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    
+    .step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+    }
+    
+    .step-number {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 10px;
+        font-weight: 700;
+        font-size: 20px;
+        box-shadow: 0 4px 15px rgba(118, 75, 162, 0.4);
+    }
+    
+    .step-number.inactive {
+        background: #e0e0e0;
+        box-shadow: none;
+    }
+    
+    .step-title {
+        font-weight: 600;
+        color: #2d3748;
+        font-size: 14px;
+    }
+    
+    .step-line {
+        position: absolute;
+        top: 25px;
+        left: 50%;
+        width: 100%;
+        height: 3px;
+        background: #e0e0e0;
+        z-index: -1;
+    }
+
+    /* SEÇİLİ INFLUENCER BADGE */
+    .selected-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        color: white;
+        padding: 6px 14px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 600;
+        margin: 4px;
+        box-shadow: 0 2px 8px rgba(17, 153, 142, 0.3);
+    }
+    
+    /* UYARI KUTULARI */
+    .stAlert {
+        border-radius: 12px;
+        border-left: 4px solid;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Supabase Bağlantısı
+# =============================================================================
+# SUPABASE BAĞLANTISI
+# =============================================================================
 try:
     SUPABASE_URL = st.secrets["SUPABASE_URL"]
     SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 except:
-    st.error("⚠️ Secrets ayarları eksik!")
+    st.error("⚠️ Supabase bağlantı bilgileri eksik! Lütfen secrets ayarlarını kontrol edin.")
     st.stop()
 
+@st.cache_resource
 def init_supabase():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 supabase = init_supabase()
 
-# Session State
+# =============================================================================
+# SESSION STATE YÖNETİMİ
+# =============================================================================
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
+if 'current_step' not in st.session_state:
+    st.session_state['current_step'] = 1
+if 'selected_influencers' not in st.session_state:
+    st.session_state['selected_influencers'] = []
+if 'budget_distribution' not in st.session_state:
+    st.session_state['budget_distribution'] = {}
 
-# -----------------------------------------------------------------------------
-# 2. FONKSİYONLAR
-# -----------------------------------------------------------------------------
+# =============================================================================
+# YARDIMCI FONKSİYONLAR
+# =============================================================================
 
-def trigger_webhook(username):
+def trigger_webhook(niche, count=10):
+    """Make.com webhook'unu tetikler"""
     webhook_url = "https://hook.eu1.make.com/ixxd5cuuqkhhkpd8sqn5soiyol0a952x"
     try:
-        requests.get(f"{webhook_url}?username={username}")
-        return True
-    except:
+        params = {
+            "niche": niche,
+            "count": count
+        }
+        response = requests.get(webhook_url, params=params, timeout=10)
+        return response.status_code == 200
+    except Exception as e:
+        st.error(f"Webhook hatası: {str(e)}")
         return False
 
-def clear_database():
+def get_influencers_by_niche(niche, limit=10):
+    """Supabase'den niche'e göre influencer'ları çeker"""
     try:
-        supabase.table('influencers').delete().neq("username", "xxxx").execute()
-        return True
+        response = supabase.table('influencers')\
+            .select("*")\
+            .ilike('niche', f'%{niche}%')\
+            .limit(limit)\
+            .execute()
+        return response.data
     except Exception as e:
-        st.error(f"Silme hatası: {e}")
-        return False
+        st.error(f"Veri çekme hatası: {str(e)}")
+        return []
 
 def safe_json_parse(raw_data):
-    if not raw_data: return []
-    if isinstance(raw_data, list): return raw_data
-    if not isinstance(raw_data, str): return []
+    """JSON verisini güvenli şekilde parse eder"""
+    if not raw_data: 
+        return []
+    if isinstance(raw_data, list): 
+        return raw_data
+    if not isinstance(raw_data, str): 
+        return []
     try:
         return json.loads(raw_data)
     except json.JSONDecodeError:
@@ -167,247 +268,437 @@ def safe_json_parse(raw_data):
         except:
             return []
 
-def get_avg_views_from_json(row):
-    raw_data = row.get('posts_raw_data')
-    posts = safe_json_parse(raw_data)
+def calculate_avg_views(posts_raw_data):
+    """Son gönderilerin ortalama izlenme sayısını hesaplar"""
+    posts = safe_json_parse(posts_raw_data)
     views_list = []
+    
     if posts and isinstance(posts, list):
         for post in posts:
-            views = post.get('videoViewCount') or post.get('playCount') or post.get('viewCount') or 0
-            if views > 0: views_list.append(views)
-    if views_list:
-        return int(sum(views_list) / len(views_list))
-    else:
-        return 0
+            views = post.get('videoViewCount') or post.get('playCount') or \
+                   post.get('viewCount') or 0
+            if views > 0:
+                views_list.append(views)
+    
+    return int(sum(views_list) / len(views_list)) if views_list else 0
 
-def calculate_roi_metrics(row, ad_cost, product_price):
+def calculate_metrics(avg_views, budget, product_price, ctr=0.02):
     """
-    KİŞİYE ÖZEL HESAPLAMA (GÜNCELLENMİŞ ROI FORMÜLÜ)
+    ROI metriklerini hesaplar
+    
+    Args:
+        avg_views: Ortalama video izlenme sayısı
+        budget: Influencer'a ödenecek tutar
+        product_price: Ürün fiyatı
+        ctr: Click-through rate (varsayılan %2)
     """
-    views = row.get('avg_views', 0)
-    clicks = row.get('Beklenen Tıklama', 0) 
+    if avg_views <= 0:
+        return {
+            'estimated_clicks': 0,
+            'estimated_revenue': 0,
+            'cpm': 0,
+            'rpm': 0,
+            'difference': 0,
+            'roi_percent': 0,
+            'is_profitable': False
+        }
     
-    if views <= 0:
-        return pd.Series([0, 0, 0, 0], index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
+    # Tahmini tıklama sayısı (CTR * İzlenme)
+    estimated_clicks = int(avg_views * ctr)
+    
+    # Tahmini gelir
+    estimated_revenue = estimated_clicks * product_price
+    
+    # CPM (Cost Per Mille - 1000 izlenme başına maliyet)
+    cpm = (budget / avg_views) * 1000
+    
+    # RPM (Revenue Per Mille - 1000 izlenme başına gelir)
+    rpm = (estimated_revenue / avg_views) * 1000
+    
+    # Fark (RPM - CPM)
+    difference = rpm - cpm
+    
+    # ROI % = ((Gelir - Maliyet) / Maliyet) * 100
+    roi_percent = ((estimated_revenue - budget) / budget) * 100 if budget > 0 else 0
+    
+    return {
+        'estimated_clicks': estimated_clicks,
+        'estimated_revenue': estimated_revenue,
+        'cpm': cpm,
+        'rpm': rpm,
+        'difference': difference,
+        'roi_percent': roi_percent,
+        'is_profitable': difference > 0
+    }
 
-    # 1. CPM (Maliyet / 1000 izlenme)
-    cpm = (ad_cost / views) * 1000
+def distribute_budget_optimally(influencers_data, total_budget):
+    """
+    Toplam bütçeyi influencer'lar arasında ROI'ye göre optimal dağıtır
+    """
+    # ROI'ye göre sırala (en yüksek fark önce)
+    sorted_data = sorted(influencers_data, 
+                        key=lambda x: x['metrics']['difference'], 
+                        reverse=True)
     
-    # 2. Gelir Hesapla: (Tıklanma x Ürün Fiyatı)
-    total_revenue = clicks * product_price
+    # Ağırlık hesapla (pozitif fark olanlar için)
+    total_weight = sum(max(0, inf['metrics']['difference']) 
+                      for inf in sorted_data)
     
-    # RPM (Gelir / 1000 izlenme)
-    rpm = (total_revenue / views) * 1000
-    
-    # 3. FARK (RPM - CPM)
-    diff = rpm - cpm
-    
-    # 4. ROI (%) -> ÖZEL FORMÜL
-    # Formül: ((Maliyet - Gelir) / Gelir) * 100
-    if total_revenue > 0:
-        roi_percent = ((ad_cost - total_revenue) / total_revenue) * 100
+    if total_weight == 0:
+        # Hiç pozitif fark yoksa eşit dağıt
+        budget_per_influencer = total_budget / len(sorted_data)
+        for inf in sorted_data:
+            inf['allocated_budget'] = budget_per_influencer
     else:
-        roi_percent = 0
+        # Ağırlıklı dağıtım
+        for inf in sorted_data:
+            weight = max(0, inf['metrics']['difference'])
+            inf['allocated_budget'] = (weight / total_weight) * total_budget
     
-    return pd.Series([cpm, rpm, diff, roi_percent], 
-                     index=['CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)'])
+    return sorted_data
 
-# -----------------------------------------------------------------------------
-# 3. ARAYÜZ
-# -----------------------------------------------------------------------------
-
-# --- GİRİŞ PANELİ ---
+# =============================================================================
+# LOGIN EKRANI
+# =============================================================================
 if not st.session_state['logged_in']:
-    c1, c2, c3 = st.columns([1, 2, 1])
-    with c2:
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
         st.markdown("<br><br><br>", unsafe_allow_html=True)
         st.markdown("""
-            <div class='glass-card' style='text-align: center;'>
-                <h2 style='font-family:Oswald; text-transform:uppercase; font-size: 2rem; margin-bottom: 20px;'>
-                    Giriş Yap
+            <div style='background: rgba(255,255,255,0.95); padding: 40px; 
+                        border-radius: 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.2);'>
+                <h2 style='text-align: center; color: #2d3748; margin-bottom: 10px;'>
+                    🎯 Influencer ROI Platform
                 </h2>
-                <p style='opacity:0.7; font-size:0.9rem;'>ROI Analiz Platformuna Hoşgeldiniz</p>
+                <p style='text-align: center; color: #718096; margin-bottom: 30px;'>
+                    Giriş yaparak analiz sistemine erişin
+                </p>
             </div>
         """, unsafe_allow_html=True)
         
-        with st.container():
-            st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
-            email = st.text_input("E-POSTA ADRESİ")
-            password = st.text_input("ŞİFRE", type="password")
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            if st.button("SİSTEME GİRİŞ", type="primary", use_container_width=True):
-                try:
-                    user = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                    if user:
-                        st.session_state['logged_in'] = True
-                        st.success("Giriş Başarılı!")
-                        time.sleep(0.5)
-                        st.rerun()
-                except:
-                    st.error("Hatalı Giriş Bilgileri")
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        email = st.text_input("📧 E-posta Adresi", placeholder="ornek@mail.com")
+        password = st.text_input("🔒 Şifre", type="password", placeholder="••••••••")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        if st.button("🚀 GİRİŞ YAP", use_container_width=True):
+            if not email or not password:
+                st.error("Lütfen tüm alanları doldurun!")
+            else:
+                with st.spinner("Giriş yapılıyor..."):
+                    try:
+                        user = supabase.auth.sign_in_with_password({
+                            "email": email, 
+                            "password": password
+                        })
+                        if user:
+                            st.session_state['logged_in'] = True
+                            st.success("✅ Giriş başarılı! Yönlendiriliyorsunuz...")
+                            time.sleep(1)
+                            st.rerun()
+                    except Exception as e:
+                        st.error("❌ Giriş bilgileri hatalı!")
     st.stop()
 
-# --- ANA DASHBOARD ---
-else:
-    # Sidebar
-    with st.sidebar:
-        st.markdown("<h2 style='color:#fff; padding-left:10px;'>KONTROL PANELİ</h2>", unsafe_allow_html=True)
-        st.markdown("---")
-        
-        st.markdown("<div style='margin-bottom:20px;'>", unsafe_allow_html=True)
-        new_u = st.text_input("YENİ ANALİZ (KULLANICI ADI)")
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        if st.button("ANALİZ ET 🚀", use_container_width=True):
-            if new_u:
-                trigger_webhook(new_u)
-                st.info("Veri isteği gönderildi...")
-        
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("<h5 style='opacity:0.6; padding-left:10px;'>VERİ YÖNETİMİ</h5>", unsafe_allow_html=True)
-        
-        if st.button("TÜM LİSTEYİ SİL", use_container_width=True):
-            if clear_database():
-                st.toast("Liste Temizlendi!", icon="🗑️")
-                time.sleep(1)
-                st.rerun()
-        
-        # --- 3. ADIM: BEHIND THE CURTAIN ---
-        st.markdown("<br>", unsafe_allow_html=True)
-        with st.expander("🕵️ BEHIND THE CURTAIN"):
-            st.markdown("""
-            <div style='font-size:0.85rem; color:#e0e0e0;'>
-                <b>HESAPLAMA MANTIĞI:</b>
-                <hr style='margin:5px 0; border-color:rgba(255,255,255,0.1);'>
-                
-                <p><b>1. CPM (Maliyet):</b><br>
-                1000 izlenme başına düşen maliyettir.<br>
-                <code>(Bütçe / İzlenme) * 1000</code></p>
-                
-                <p><b>2. RPM (Gelir):</b><br>
-                1000 izlenme başına üretilen tahmini gelirdir.<br>
-                <code>(Tıklama x Fiyat / İzlenme) * 1000</code></p>
-                
-                <p><b>3. ROI (Özel Formül):</b><br>
-                Yatırımın maliyet/gelir dengesini ölçer.<br>
-                <code>((Maliyet - Gelir) / Gelir) * 100</code><br>
-                <i style='color:#ff9e00'>*Negatif sonuç kârı, Pozitif sonuç zararı gösterir.</i></p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("ÇIKIŞ YAP", use_container_width=True):
-            st.session_state['logged_in'] = False
-            st.rerun()
+# =============================================================================
+# ANA DASHBOARD
+# =============================================================================
 
-    # --- ANA EKRAN İÇERİĞİ ---
+# SIDEBAR
+with st.sidebar:
+    st.markdown("### ⚙️ Ayarlar")
+    st.markdown("---")
     
-    st.markdown("""
-        <div>
-            <h1 class='hero-title'>ROI ANALİZ</h1>
-            <h3 class='subtitle'>INFLUENCER PERFORMANS SİMÜLATÖRÜ</h3>
+    if st.button("🚪 Çıkış Yap", use_container_width=True):
+        st.session_state['logged_in'] = False
+        st.session_state['current_step'] = 1
+        st.session_state['selected_influencers'] = []
+        st.rerun()
+    
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("### 📊 İstatistikler")
+    
+    try:
+        total_count = supabase.table('influencers').select("*", count='exact').execute()
+        st.metric("Toplam Influencer", total_count.count or 0)
+    except:
+        st.metric("Toplam Influencer", "N/A")
+    
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("### ℹ️ Hesaplama Mantığı")
+    with st.expander("Formüller"):
+        st.markdown("""
+        **CPM (Cost Per Mille):**  
+        `(Bütçe / İzlenme) × 1000`
+        
+        **RPM (Revenue Per Mille):**  
+        `(Gelir / İzlenme) × 1000`
+        
+        **ROI (%):**  
+        `((Gelir - Maliyet) / Maliyet) × 100`
+        
+        **Fark:**  
+        `RPM - CPM`
+        
+        ✅ Fark > 0 → Kârlı  
+        ❌ Fark < 0 → Zararlı
+        """)
+
+# ANA İÇERİK
+st.markdown("<h1 class='main-title'>🎯 Influencer ROI Analizi</h1>", unsafe_allow_html=True)
+st.markdown("<p class='subtitle'>Akıllı bütçe dağılımı ve ROI tahmini</p>", unsafe_allow_html=True)
+
+# STEP INDICATOR
+steps = [
+    ("1", "Kampanya Bilgileri", st.session_state['current_step'] >= 1),
+    ("2", "Influencer Seçimi", st.session_state['current_step'] >= 2),
+    ("3", "ROI Analizi", st.session_state['current_step'] >= 3)
+]
+
+st.markdown("<div class='step-container'>", unsafe_allow_html=True)
+for i, (num, title, is_active) in enumerate(steps):
+    active_class = "" if is_active else "inactive"
+    st.markdown(f"""
+        <div class='step'>
+            <div class='step-number {active_class}'>{num}</div>
+            <div class='step-title'>{title}</div>
         </div>
     """, unsafe_allow_html=True)
+st.markdown("</div>", unsafe_allow_html=True)
 
-    # --- 1. ADIM: GİRDİ ALANLARINI DÜZENLEME ---
-    st.markdown("<div class='glass-card'>", unsafe_allow_html=True)
+# =============================================================================
+# STEP 1: KAMPANYA BİLGİLERİ
+# =============================================================================
+if st.session_state['current_step'] == 1:
+    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+    st.markdown("### 📝 Kampanya Detayları")
+    st.markdown("Lütfen kampanyanızın temel bilgilerini girin")
+    st.markdown("</div>", unsafe_allow_html=True)
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("<h4 style='margin:0; opacity:0.9; font-size:1.2rem;'>💸 INFLUENCER'A ÖDENECEK TUTAR ($)</h4>", unsafe_allow_html=True)
-        st.caption("Anlaşma sağlanan influencer'a ödenecek toplam net ücreti giriniz.")
-        ad_cost = st.number_input("Influencer Bütçesi", value=1000, step=100, label_visibility="collapsed")
+        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+        st.markdown("#### 🎨 Niche (Kategori)")
+        niche = st.text_input(
+            "kategori",
+            placeholder="Örn: teknoloji, moda, fitness, gaming...",
+            label_visibility="collapsed"
+        )
+        st.caption("Ürününüzün hedef kategorisini girin")
+        st.markdown("</div>", unsafe_allow_html=True)
     
     with col2:
-        st.markdown("<h4 style='margin:0; opacity:0.9; font-size:1.2rem;'>🏷️ ÜRÜNÜN SATIŞ FİYATI ($)</h4>", unsafe_allow_html=True)
-        st.caption("Reklamı yapılan ürünün birim satış fiyatını (KDV dahil) giriniz.")
-        prod_price = st.number_input("Ürün Fiyatı", value=30.0, step=5.0, label_visibility="collapsed")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    # Veri İşleme
-    response = supabase.table('influencers').select("*").execute()
-    
-    if response.data:
-        df = pd.DataFrame(response.data)
-        
-        # Temel Veri Hazırlığı
-        if 'Niche' not in df.columns:
-            if 'niche' in df.columns: df['Niche'] = df['niche']
-            else: df['Niche'] = "Genel"
-        df['Niche'] = df['Niche'].fillna("Genel").replace("", "Genel")
-        
-        # İzlenmeleri Çek
-        df['avg_views'] = df.apply(get_avg_views_from_json, axis=1)
-
-        # ---------------------------------------------------------------------
-        # KİŞİYE ÖZEL TIKLAMA GİRİŞİ (Editable Dataframe)
-        # ---------------------------------------------------------------------
-        st.markdown("### 🖱️ TIKLAMA TAHMİNLERİNİ GİRİNİZ")
-        st.info("Aşağıdaki tabloda **'Beklenen Tıklama'** sütununa her influencer için tahmininizi yazın, sonuçlar otomatik hesaplanacaktır.")
-
-        if 'Beklenen Tıklama' not in df.columns:
-            df['Beklenen Tıklama'] = 500
-
-        # Görüntülenecek ve Düzenlenecek Sütunlar
-        editor_cols = ['username', 'Niche', 'avg_views', 'Beklenen Tıklama']
-        
-        edited_df = st.data_editor(
-            df[editor_cols],
-            column_config={
-                "username": st.column_config.TextColumn("Kullanıcı Adı", disabled=True),
-                "Niche": st.column_config.TextColumn("Kategori", disabled=True),
-                "avg_views": st.column_config.NumberColumn("Ort. İzlenme", disabled=True, format="%d"),
-                "Beklenen Tıklama": st.column_config.NumberColumn("Beklenen Tıklama (Adet)", min_value=0, step=10, required=True)
-            },
-            hide_index=True,
-            use_container_width=True,
-            num_rows="fixed"
+        st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+        st.markdown("#### 💰 Toplam Reklam Bütçesi")
+        total_budget = st.number_input(
+            "bütçe",
+            min_value=100.0,
+            value=10000.0,
+            step=500.0,
+            format="%.2f",
+            label_visibility="collapsed"
         )
-
-        # ---------------------------------------------------------------------
-        # HESAPLAMA
-        # ---------------------------------------------------------------------
-        metrics = edited_df.apply(calculate_roi_metrics, args=(ad_cost, prod_price), axis=1)
-        results_df = pd.concat([edited_df, metrics], axis=1)
-        
-        # Geçerli verileri filtrele
-        df_valid = results_df[results_df['avg_views'] > 0].copy()
-        
-        if not df_valid.empty:
-            # Sıralamayı (RPM - CPM) Farkına göre yap
-            df_valid = df_valid.sort_values(by="Fark ($)", ascending=False)
-            
-            # --- 2. ADIM: TAVSİYE KUTUSU KALDIRILDI ---
-            # Burada artık doğrudan tablo gösteriliyor.
-
-            # SONUÇ TABLOSU
-            st.subheader("📋 SONUÇ RAPORU")
-            cols = ['username', 'avg_views', 'Beklenen Tıklama', 'CPM ($)', 'RPM ($)', 'Fark ($)', 'ROI (%)']
-            
-            def safe_highlight(val):
-                try:
-                    if isinstance(val, str): return ''
-                    # Fark pozitifse (Kâr varsa) yeşil, yoksa kırmızı
-                    color = 'rgba(56, 239, 125, 0.2)' if val > 0 else 'rgba(255, 75, 31, 0.2)'
-                    return f'background-color: {color}; color: white;'
-                except: return ''
-
-            st.dataframe(
-                df_valid[cols].style.format({
-                    "avg_views": "{:,.0f}",
-                    "Beklenen Tıklama": "{:,.0f}",
-                    "CPM ($)": "${:.2f}",
-                    "RPM ($)": "${:.2f}",
-                    "Fark ($)": "${:+.2f}",
-                    "ROI (%)": "{:.2f}%"
-                }).applymap(safe_highlight, subset=['Fark ($)']),
-                use_container_width=True,
-                height=500
-            )
-
+        st.caption("Influencer'lara ayıracağınız toplam bütçe ($)")
+        st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+    st.markdown("#### 🏷️ Ürün Satış Fiyatı")
+    product_price = st.number_input(
+        "fiyat",
+        min_value=1.0,
+        value=50.0,
+        step=5.0,
+        format="%.2f",
+        label_visibility="collapsed"
+    )
+    st.caption("Ürününüzün birim satış fiyatı ($)")
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    if st.button("🔍 INFLUENCER ARA", use_container_width=True, type="primary"):
+        if not niche:
+            st.error("❌ Lütfen bir niche girin!")
         else:
-            st.warning("Veri var ama videolu gönderi yok.")
-    else:
-        st.info("Listeniz boş. Soldan yeni analiz başlatın.")
+            with st.spinner(f"'{niche}' kategorisinde influencer'lar aranıyor..."):
+                # Önce veritabanında ara
+                influencers = get_influencers_by_niche(niche, 10)
+                
+                if not influencers or len(influencers) < 5:
+                    # Yeterli veri yoksa webhook tetikle
+                    st.info("Yeterli veri bulunamadı, yeni veri çekiliyor...")
+                    if trigger_webhook(niche, 10):
+                        st.success("Veri çekme isteği gönderildi! 30 saniye sonra tekrar deneyin.")
+                        time.sleep(2)
+                    else:
+                        st.error("Veri çekme hatası!")
+                else:
+                    # Veriyi session state'e kaydet
+                    st.session_state['niche'] = niche
+                    st.session_state['total_budget'] = total_budget
+                    st.session_state['product_price'] = product_price
+                    st.session_state['influencers_raw'] = influencers
+                    st.session_state['current_step'] = 2
+                    st.success(f"✅ {len(influencers)} influencer bulundu!")
+                    time.sleep(1)
+                    st.rerun()
+
+# =============================================================================
+# STEP 2: INFLUENCER SEÇİMİ
+# =============================================================================
+elif st.session_state['current_step'] == 2:
+    influencers = st.session_state.get('influencers_raw', [])
+    
+    if not influencers:
+        st.warning("Influencer verisi bulunamadı!")
+        if st.button("← Başa Dön"):
+            st.session_state['current_step'] = 1
+            st.rerun()
+        st.stop()
+    
+    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+    st.markdown("### 👥 Influencer Listesi")
+    st.markdown(f"**Kategori:** {st.session_state.get('niche', 'N/A')} | "
+                f"**Toplam Bütçe:** ${st.session_state.get('total_budget', 0):,.2f}")
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # DataFrame oluştur
+    df_data = []
+    for inf in influencers:
+        avg_views = calculate_avg_views(inf.get('posts_raw_data'))
+        df_data.append({
+            'username': inf.get('username', 'N/A'),
+            'followers': inf.get('followerCount', 0),
+            'avg_views': avg_views,
+            'engagement_rate': f"{(avg_views / inf.get('followerCount', 1) * 100):.2f}%" 
+                              if inf.get('followerCount', 0) > 0 else "0%"
+        })
+    
+    df = pd.DataFrame(df_data)
+    
+    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+    st.dataframe(
+        df.style.format({
+            'followers': '{:,.0f}',
+            'avg_views': '{:,.0f}'
+        }),
+        use_container_width=True,
+        height=400
+    )
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("← Geri", use_container_width=True):
+            st.session_state['current_step'] = 1
+            st.rerun()
+    
+    with col2:
+        if st.button("ROI ANALİZİNE GEÇ →", use_container_width=True, type="primary"):
+            st.session_state['current_step'] = 3
+            st.rerun()
+
+# =============================================================================
+# STEP 3: ROI ANALİZİ VE BÜTÇE DAĞILIMI
+# =============================================================================
+elif st.session_state['current_step'] == 3:
+    influencers = st.session_state.get('influencers_raw', [])
+    total_budget = st.session_state.get('total_budget', 0)
+    product_price = st.session_state.get('product_price', 0)
+    
+    if not influencers:
+        st.warning("Veri bulunamadı!")
+        if st.button("← Başa Dön"):
+            st.session_state['current_step'] = 1
+            st.rerun()
+        st.stop()
+    
+    # CTR ayarı
+    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+    st.markdown("### ⚙️ Gelişmiş Ayarlar")
+    ctr = st.slider(
+        "Tahmini Tıklama Oranı (CTR %)",
+        min_value=0.5,
+        max_value=10.0,
+        value=2.0,
+        step=0.5,
+        help="Video izleyicilerinin kaçının tıklayacağını tahmin eder"
+    ) / 100
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Her influencer için metrikleri hesapla
+    influencers_with_metrics = []
+    for inf in influencers:
+        avg_views = calculate_avg_views(inf.get('posts_raw_data'))
+        
+        if avg_views > 0:
+            # Eşit bütçe payı (önce eşit dağıt, sonra optimize edilecek)
+            initial_budget = total_budget / len(influencers)
+            
+            metrics = calculate_metrics(avg_views, initial_budget, product_price, ctr)
+            
+            influencers_with_metrics.append({
+                'username': inf.get('username', 'N/A'),
+                'followers': inf.get('followerCount', 0),
+                'avg_views': avg_views,
+                'metrics': metrics,
+                'allocated_budget': initial_budget
+            })
+    
+    # Bütçeyi optimal dağıt
+    optimized_data = distribute_budget_optimally(influencers_with_metrics, total_budget)
+    
+    # Her influencer için metrikleri yeniden hesapla (optimize edilmiş bütçeyle)
+    for inf_data in optimized_data:
+        inf_data['metrics'] = calculate_metrics(
+            inf_data['avg_views'],
+            inf_data['allocated_budget'],
+            product_price,
+            ctr
+        )
+    
+    # Sonuçları göster
+    st.markdown("<div class='metric-card'>", unsafe_allow_html=True)
+    st.markdown("### 📊 ROI Analiz Sonuçları")
+    st.markdown("Önerilen bütçe dağılımı ve karlılık tahmini")
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Özet metrikler
+    col1, col2, col3, col4 = st.columns(4)
+    
+    total_estimated_revenue = sum(d['metrics']['estimated_revenue'] for d in optimized_data)
+    total_estimated_roi = ((total_estimated_revenue - total_budget) / total_budget * 100) if total_budget > 0 else 0
+    profitable_count = sum(1 for d in optimized_data if d['metrics']['is_profitable'])
+    
+    with col1:
+        st.metric("💰 Tahmini Gelir", f"${total_estimated_revenue:,.2f}")
+    with col2:
+        st.metric("📈 Tahmini ROI", f"{total_estimated_roi:.2f}%")
+    with col3:
+        st.metric("✅ Karlı Influencer", f"{profitable_count}/{len(optimized_data)}")
+    with col4:
+        net_profit = total_estimated_revenue - total_budget
+        st.metric("💵 Net Kâr/Zarar", f"${net_profit:,.2f}")
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Detaylı tablo
+    result_data = []
+    for inf in optimized_data:
+        result_data.append({
+            'Kullanıcı Adı': f"@{inf['username']}",
+            'Takipçi': inf['followers'],
+            'Ort. İzlenme': inf['avg_views'],
+            'Önerilen Bütçe ($)': inf['allocated_budget'],
+            'Tahmini Tıklama': inf['metrics']['estimated_clicks'],
+            'Tahmini Gelir ($)': inf['metrics']['estimated_revenue'],
+            'CPM ($)': inf['metrics']['cpm'],
+            'RPM ($)': inf['metrics']['rpm'],
+            'Fark ($)': inf['metrics']['difference'],
+            'ROI (%)': inf['metrics']['roi_percent']
+        })
