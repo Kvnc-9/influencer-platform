@@ -41,7 +41,6 @@ st.markdown("""
     .stDataFrame {
         border: 1px solid #FF6D00;
     }
-    /* Tablo başlıkları siyah olabilir okunabilirlik için, ama genel tema koyu */
     
     /* Buton Tasarımı */
     .stButton>button {
@@ -67,9 +66,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- VERİ SETİ (CPM Çıkarıldı, İzlenme Eklendi) ---
+# --- VERİ SETİ ---
 def get_initial_data():
-    # Not: CPM hesaplanacağı için buraya gerçek "Avg_Views" (İzlenme) ekledik.
     return {
         "Beauty & Güzellik": [
             {"Influencer": "Merve Özkaynak", "Alignment": 96, "Avg_Views": 550000, "Manuel_Tiklanma": 500},
@@ -113,7 +111,7 @@ def get_initial_data():
 st.title("🍊 Influencer ROI Master (Dark Edition)")
 st.write("İzlenme verileri otomatik gelir. Sadece tıklanma sayılarını girin ve hesaplayın.")
 
-# GİRİŞ ALANI (TEK EKRAN ÜST KISIM)
+# GİRİŞ ALANI
 col_input1, col_input2, col_input3 = st.columns(3)
 
 with col_input1:
@@ -133,7 +131,7 @@ if 'df_data_dark' not in st.session_state or st.session_state.get('current_niche
     st.session_state.df_data_dark = pd.DataFrame(get_initial_data()[niche])
     st.session_state.current_niche_dark = niche
 
-# Editable Dataframe (Sadece Tıklanma Açık)
+# Editable Dataframe (HATA DÜZELTİLDİ: disabled parametresi data_editor içine alındı)
 edited_df = st.data_editor(
     st.session_state.df_data_dark,
     column_config={
@@ -145,21 +143,20 @@ edited_df = st.data_editor(
             required=True
         ),
         "Avg_Views": st.column_config.NumberColumn(
-            "Ort. İzlenme (Sabit)",
-            disabled=True # Düzenlenemez
+            "Ort. İzlenme (Sabit)"
         ),
         "Alignment": st.column_config.ProgressColumn(
             "Marka Uyumu",
             format="%d",
             min_value=0,
-            max_value=100,
-            disabled=True
+            max_value=100
         ),
         "Influencer": st.column_config.TextColumn(
-            "Influencer",
-            disabled=True
+            "Influencer"
         )
     },
+    # DÜZELTME BURADA: Düzenlenmesini istemediğimiz sütunları buraya yazıyoruz
+    disabled=["Influencer", "Avg_Views", "Alignment"],
     use_container_width=True,
     hide_index=True,
     num_rows="fixed"
@@ -169,7 +166,7 @@ edited_df = st.data_editor(
 st.markdown("<br>", unsafe_allow_html=True)
 if st.button("HESAPLAMALARI BAŞLAT"):
     
-    # --- HESAPLAMA MOTORU (SENİN FORMÜLLERİN) ---
+    # --- HESAPLAMA MOTORU ---
     df_calc = edited_df.copy()
 
     # 1. Maliyet Dağılımı (Alignment'a göre)
@@ -186,12 +183,10 @@ if st.button("HESAPLAMALARI BAŞLAT"):
 
     # 4. RPM HESABI (SENİN FORMÜLÜN)
     # RPM = ((Tıklanma x Ürün Fiyatı) / İzlenme) x 1000
-    # Yani: RPM = (Gelir / İzlenme) * 1000
     df_calc['RPM'] = (df_calc['Gelir'] / df_calc['Avg_Views']) * 1000
 
     # 5. ROI HESABI (SENİN FORMÜLÜN)
     # ROI = (Gelir - Maliyet) / Maliyet x 100
-    # (Kar = Gelir - Maliyet)
     df_calc['Kar'] = df_calc['Gelir'] - df_calc['Maliyet']
     df_calc['ROI (%)'] = (df_calc['Kar'] / df_calc['Maliyet']) * 100
 
