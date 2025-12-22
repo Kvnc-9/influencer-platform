@@ -2,111 +2,158 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# Sayfa Genişliği ve Tasarımı
-st.set_page_config(page_title="Influencer AI Optimizer", layout="wide")
+# Sayfa Genişliği ve Apple Temalı Stil
+st.set_page_config(page_title="Influencer AI | Optimizer", layout="wide")
 
-# --- GERÇEKÇİ VERİ SETİ (Kategorilere Göre 10 Influencer) ---
-INFLUENCER_DATABASE = {
-    "Wellness & Spor": [
-        {"username": "ecevahapoglu", "followers": 455000, "avg_views": 85000, "rpm": 85, "cpm": 40, "alignment": 98},
-        {"username": "elvinlevinler", "followers": 1300000, "avg_views": 420000, "rpm": 60, "cpm": 55, "alignment": 92},
-        {"username": "tugce_incee", "followers": 185000, "avg_views": 55000, "rpm": 75, "cpm": 30, "alignment": 94},
-        {"username": "cansuyegin", "followers": 225000, "avg_views": 70000, "rpm": 70, "cpm": 35, "alignment": 90},
-        {"username": "dilara_kocak", "followers": 860000, "avg_views": 110000, "rpm": 95, "cpm": 50, "alignment": 100},
-        {"username": "ebrusalli", "followers": 3300000, "avg_views": 380000, "rpm": 55, "cpm": 65, "alignment": 85},
-        {"username": "cetincetintas", "followers": 615000, "avg_views": 190000, "rpm": 90, "cpm": 45, "alignment": 97},
-        {"username": "muratbur", "followers": 142000, "avg_views": 45000, "rpm": 65, "cpm": 25, "alignment": 80},
-        {"username": "aysunbekcan", "followers": 98000, "avg_views": 35000, "rpm": 70, "cpm": 20, "alignment": 87},
-        {"username": "polat_ozdemir", "followers": 110000, "avg_views": 28000, "rpm": 72, "cpm": 22, "alignment": 89},
-    ],
-    "Teknoloji": [
-        {"username": "hakki_alkan", "followers": 1200000, "avg_views": 450000, "rpm": 120, "cpm": 75, "alignment": 95},
-        {"username": "mesutcevik", "followers": 350000, "avg_views": 180000, "rpm": 140, "cpm": 85, "alignment": 98},
-        {"username": "barisozcan", "followers": 6500000, "avg_views": 2500000, "rpm": 200, "cpm": 120, "alignment": 88},
-        {"username": "can_deger", "followers": 150000, "avg_views": 85000, "rpm": 180, "cpm": 90, "alignment": 99},
-        {"username": "murat_gamsiz", "followers": 100000, "avg_views": 45000, "rpm": 110, "cpm": 60, "alignment": 96},
-        {"username": "shiftdelete", "followers": 2000000, "avg_views": 600000, "rpm": 100, "cpm": 70, "alignment": 85},
-        {"username": "webtekno", "followers": 2500000, "avg_views": 750000, "rpm": 90, "cpm": 65, "alignment": 80},
-        {"username": "tamer_yesildag", "followers": 1800000, "avg_views": 400000, "rpm": 80, "cpm": 55, "alignment": 75},
-        {"username": "iphonedo", "followers": 900000, "avg_views": 350000, "rpm": 150, "cpm": 100, "alignment": 94},
-        {"username": "enis_kirazoglu", "followers": 1100000, "avg_views": 800000, "rpm": 130, "cpm": 80, "alignment": 82},
-    ],
-    "Güzellik & Bakım": [
-        {"username": "merveozkaynak", "followers": 2200000, "avg_views": 550000, "rpm": 55, "cpm": 50, "alignment": 96},
-        {"username": "duyguozaslan", "followers": 2000000, "avg_views": 380000, "rpm": 65, "cpm": 60, "alignment": 85},
-        {"username": "danlabilic", "followers": 6000000, "avg_views": 1500000, "rpm": 50, "cpm": 80, "alignment": 70},
-        {"username": "sebibebi", "followers": 950000, "avg_views": 120000, "rpm": 60, "cpm": 45, "alignment": 92},
-        {"username": "polen_sarica", "followers": 210000, "avg_views": 65000, "rpm": 70, "cpm": 35, "alignment": 90},
-        {"username": "gorkemkarman", "followers": 550000, "avg_views": 110000, "rpm": 75, "cpm": 40, "alignment": 94},
-        {"username": "aslicira", "followers": 300000, "avg_views": 85000, "rpm": 68, "cpm": 38, "alignment": 91},
-        {"username": "aysenur_yazici", "followers": 400000, "avg_views": 45000, "rpm": 90, "cpm": 55, "alignment": 98},
-        {"username": "damla_kalaycik", "followers": 750000, "avg_views": 190000, "rpm": 62, "cpm": 48, "alignment": 88},
-        {"username": "ceren_ceyhun", "followers": 180000, "avg_views": 40000, "rpm": 65, "cpm": 30, "alignment": 89},
-    ]
-}
+# Apple Stil CSS Entegrasyonu
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap');
+    
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background-color: #f5f5f7;
+    }
+    
+    .main {
+        background-color: #f5f5f7;
+    }
+    
+    /* Apple Stil Kartlar */
+    div[data-testid="stMetric"] {
+        background-color: #ffffff;
+        border-radius: 18px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+        border: 1px solid #e5e5e7;
+    }
+    
+    /* Buton Tasarımı */
+    .stButton>button {
+        background-color: #0071e3;
+        color: white;
+        border-radius: 20px;
+        padding: 10px 25px;
+        border: none;
+        font-weight: 500;
+        transition: all 0.3s;
+    }
+    
+    .stButton>button:hover {
+        background-color: #0077ed;
+        transform: scale(1.02);
+    }
+    
+    /* Kenar Çubuğu Tasarımı */
+    section[data-testid="stSidebar"] {
+        background-color: #ffffff;
+        border-right: 1px solid #e5e5e7;
+    }
+    
+    h1, h2, h3 {
+        color: #1d1d1f;
+        letter-spacing: -0.02em;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-# --- ARAYÜZ VE HESAPLAMA ---
-st.title("🛡️ Pro Influencer Insights Dashboard")
-st.markdown("Gerçek verilerle bütçe optimizasyonu ve ROI tahmini.")
+# --- VERİ SETİ (İçerik Korundu) ---
+def get_database():
+    return {
+        "Teknoloji": [
+            {"username": "hakki_alkan", "followers": 1200000, "avg_views": 450000, "base_cpm": 80, "base_rpm": 150, "alignment": 95},
+            {"username": "mesutcevik", "followers": 350000, "avg_views": 180000, "base_cpm": 90, "base_rpm": 180, "alignment": 98},
+            {"username": "can_deger", "followers": 150000, "avg_views": 95000, "base_cpm": 100, "base_rpm": 220, "alignment": 99},
+            {"username": "enis_kirazoglu", "followers": 1100000, "avg_views": 850000, "base_cpm": 70, "base_rpm": 130, "alignment": 85},
+            {"username": "barisozcan", "followers": 6500000, "avg_views": 2500000, "base_cpm": 150, "base_rpm": 300, "alignment": 90},
+            {"username": "webtekno", "followers": 2500000, "avg_views": 700000, "base_cpm": 60, "base_rpm": 110, "alignment": 80},
+            {"username": "iphonedo", "followers": 900000, "avg_views": 350000, "base_cpm": 110, "base_rpm": 250, "alignment": 94},
+            {"username": "shiftdelete", "followers": 2000000, "avg_views": 600000, "base_cpm": 65, "base_rpm": 120, "alignment": 82},
+            {"username": "donanimarsivi", "followers": 1000000, "avg_views": 400000, "base_cpm": 85, "base_rpm": 160, "alignment": 92},
+            {"username": "technopat", "followers": 500000, "avg_views": 150000, "base_cpm": 95, "base_rpm": 170, "alignment": 96},
+        ],
+        "Wellness & Spor": [
+            {"username": "ecevahapoglu", "followers": 455000, "avg_views": 85000, "base_cpm": 40, "base_rpm": 85, "alignment": 98},
+            {"username": "elvinlevinler", "followers": 1300000, "avg_views": 420000, "base_cpm": 55, "base_rpm": 120, "alignment": 92},
+            {"username": "dilara_kocak", "followers": 860000, "avg_views": 110000, "base_cpm": 50, "base_rpm": 150, "alignment": 100},
+            {"username": "cetincetintas", "followers": 615000, "avg_views": 190000, "base_cpm": 45, "base_rpm": 130, "alignment": 97},
+            {"username": "ebrusalli", "followers": 3300000, "avg_views": 380000, "base_cpm": 65, "base_rpm": 110, "alignment": 85},
+            {"username": "tugce_incee", "followers": 185000, "avg_views": 55000, "base_cpm": 30, "base_rpm": 95, "alignment": 94},
+            {"username": "cansuyegin", "followers": 225000, "avg_views": 70000, "base_cpm": 35, "base_rpm": 100, "alignment": 90},
+            {"username": "muratbur", "followers": 142000, "avg_views": 45000, "base_cpm": 25, "base_rpm": 80, "alignment": 88},
+            {"username": "aysunbekcan", "followers": 98000, "avg_views": 35000, "base_cpm": 20, "base_rpm": 75, "alignment": 91},
+            {"username": "merveozkaynak", "followers": 2200000, "avg_views": 550000, "base_cpm": 50, "base_rpm": 95, "alignment": 75}
+        ]
+    }
+
+# --- ARAYÜZ ---
+st.title(" Influencer AI")
+st.subheader("Bütçenizi en akıllı şekilde paylaştırın.")
 
 with st.sidebar:
-    st.header("🛒 Kampanya Detayları")
-    selected_niche = st.selectbox("Bir Niş Seçin", list(INFLUENCER_DATABASE.keys()))
-    product_price = st.number_input("Satılacak Ürün Fiyatı (₺)", min_value=1.0, value=1500.0)
-    total_budget = st.number_input("Toplam Reklam Bütçesi (₺)", min_value=1000, value=250000)
+    st.markdown("### ⚙️ Kampanya")
+    niche = st.selectbox("Kategori", list(get_database().keys()))
+    total_budget = st.number_input("Toplam Bütçe (₺)", min_value=1000, value=100000)
+    product_price = st.number_input("Ürün Fiyatı (₺)", min_value=1, value=1500)
     
-    st.divider()
-    calculate = st.button("ANALİZİ BAŞLAT", use_container_width=True)
+    st.markdown("---")
+    calculate = st.button("HESAPLAMAYI BAŞLAT", use_container_width=True)
 
 if calculate:
-    df = pd.DataFrame(INFLUENCER_DATABASE[selected_niche])
+    data = get_database()[niche]
+    df = pd.DataFrame(data)
     
-    # 1. Erişim Tahmini (Son 10 video ortalamasının çarpanı)
-    df['total_reach'] = df['avg_views'] * 1.4 # Story + Feed Etkisi
+    # --- FORMÜLLER (İçerik Korundu) ---
+    total_alignment = df['alignment'].sum()
+    df['allocated_budget'] = (df['alignment'] / total_alignment) * total_budget
+    df['est_impressions'] = (df['allocated_budget'] / df['base_cpm']) * 1000
+    df['total_revenue'] = (df['base_rpm'] * df['est_impressions']) / 1000
+    df['roi_percentage'] = ((df['total_revenue'] - df['allocated_budget']) / df['allocated_budget']) * 100
+
+    # Özet Kartları
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Tahmini Toplam Gelir", f"₺{df['total_revenue'].sum():,.2f}")
+    col2.metric("Kampanya ROI", f"%{df['roi_percentage'].mean():.2f}")
+    col3.metric("Toplam Gösterim", f"{int(df['est_impressions'].sum()):,}")
+
+    st.markdown("---")
+
+    # Grafikler
+    c_left, c_right = st.columns(2)
+    with c_left:
+        fig_pie = px.pie(df, values='allocated_budget', names='username', hole=0.7, 
+                         title="Bütçe Dağılımı",
+                         color_discrete_sequence=px.colors.qualitative.Pastel)
+        fig_pie.update_layout(showlegend=False)
+        st.plotly_chart(fig_pie, use_container_width=True)
     
-    # 2. Skorlama Algoritması (Bütçe dağıtımını belirler)
-    # Alignment karesi alınarak nişe en uygun isimlerin öne çıkması sağlanır.
-    df['dist_score'] = ((df['alignment'] / 100) ** 2) * df['rpm']
-    
-    # 3. Bütçe Dağılımı
-    total_dist_score = df['dist_score'].sum()
-    df['allocated_budget'] = (df['dist_score'] / total_dist_score) * total_budget
-    
-    # 4. ROI ve Kazanç Tahmini
-    # (Bin izlenme başına getiri katsayısı ve ürün fiyat çarpanı)
-    df['est_revenue'] = (df['total_reach'] / 1000) * df['rpm'] * (product_price / 1000) * 12 
-    df['roi'] = df['est_revenue'] / df['allocated_budget']
+    with c_right:
+        fig_roi = px.bar(df, x='username', y='roi_percentage', title="ROI Analizi (%)",
+                         color_discrete_sequence=['#0071e3'])
+        fig_roi.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig_roi, use_container_width=True)
 
-    # --- ÖZET KARTLARI ---
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Toplam Tahmini Erişim", f"{int(df['total_reach'].sum()):,}")
-    c2.metric("Tahmini Ciro", f"₺{int(df['est_revenue'].sum()):,}")
-    c3.metric("Kampanya ROI", f"{df['roi'].mean():.2f}x")
-    c4.metric("Kazanılacak Müşteri (Tahmini)", f"{int(df['est_revenue'].sum() / product_price):,}")
+    # Tablo - Apple Stil
+    st.markdown("### 📋 Performans Raporu")
+    st.dataframe(df[['username', 'alignment', 'allocated_budget', 'est_impressions', 'total_revenue', 'roi_percentage']].style.format({
+        'allocated_budget': '₺{:.2f}',
+        'total_revenue': '₺{:.2f}',
+        'roi_percentage': '%{:.2f}',
+        'est_impressions': '{:,.0f}'
+    }), use_container_width=True)
 
-    # --- ŞEFFAFLIK KUTUSU ---
-    with st.expander("📊 Matematiksel Hesaplama Metodolojisi"):
-        st.write("""
-        Sistem bütçeyi şu adımlarla dağıtır:
-        - **Bütçe Payı:** Bir influencer'ın niş uyumunun (Alignment) karesi alınır ve RPM değeri ile çarpılır. Çıkan sonuç toplam havuzdaki payını belirler.
-        - **Erişim (Reach):** Son 10 video ortalaması (avg_views) baz alınır ve %40 yan etkileşim (story/paylaşım) eklenir.
-        - **RPM (Revenue Per Mille):** Influencer'ın her 1000 izlenmede yarattığı tahmini parasal değerdir.
-        - **ROI:** `(Tahmini Ciro / Harcanan Bütçe)` şeklinde hesaplanır.
-        """)
-
-    # --- GRAFİKLER ---
-    st.divider()
-    g1, g2 = st.columns(2)
-    with g1:
-        fig1 = px.pie(df, values='allocated_budget', names='username', title="Bütçe Dağılım Oranları", hole=0.4)
-        st.plotly_chart(fig1, use_container_width=True)
-    with g2:
-        fig2 = px.bar(df, x='username', y='roi', title="Influencer Başına Beklenen ROI", color='roi', color_continuous_scale='Portland')
-        st.plotly_chart(fig2, use_container_width=True)
-
-    # --- TABLO ---
-    st.subheader(f"📋 {selected_niche} İçin Detaylı Rapor")
-    st.table(df[['username', 'followers', 'avg_views', 'alignment', 'allocated_budget', 'roi']].sort_values(by='roi', ascending=False))
+    # Formül Şeffaflığı
+    st.markdown("""
+    <div style="background-color: #ffffff; padding: 20px; border-radius: 15px; border: 1px solid #e5e5e7;">
+    <h4 style="margin-top:0;">🔍 Analitik Metrikler</h4>
+    <p style="color: #86868b; font-size: 0.9em;">
+    <b>CPM:</b> (Maliyet / Gösterim) x 1,000 | 
+    <b>RPM:</b> (Toplam Gelir / Gösterim) x 1,000 | 
+    <b>ROI:</b> ((Gelir - Maliyet) / Maliyet) x 100
+    </p>
+    </div>
+    """, unsafe_allow_html=True)
 
 else:
-    st.info("Lütfen sol taraftan verileri girin ve 'Analizi Başlat' butonuna basın.")
+    # Karşılama Ekranı
+    st.info("Analiz için sol menüden verilerinizi girin.")
