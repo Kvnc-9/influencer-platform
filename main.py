@@ -108,7 +108,7 @@ def get_initial_data():
     }
 
 # --- ARAYÜZ ---
-st.title("🍊 Influencer ROI Master (Dark Edition)")
+st.title("🍊 Influencer Insights Platform ")
 st.write("İzlenme verileri otomatik gelir. Sadece tıklanma sayılarını girin ve hesaplayın.")
 
 # GİRİŞ ALANI
