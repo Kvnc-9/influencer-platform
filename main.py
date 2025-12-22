@@ -2,77 +2,98 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# Sayfa Konfigürasyonu
-st.set_page_config(page_title="Influencer AI | Pro Optimizer", layout="wide")
+# --- SAYFA AYARLARI ---
+st.set_page_config(page_title="Influencer AI | Optimizer", layout="wide")
 
-# APPLE DESIGN CSS (Minimalist & Innovative)
+# --- CUSTOM CSS (Görseldeki Tasarım Dili) ---
 st.markdown("""
     <style>
-    /* San Francisco benzeri font */
-    @import url('https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;600&family=Inter:wght@300;400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&display=swap');
     
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-        background-color: #ffffff;
+    /* Genel Sayfa Yapısı */
+    .stApp {
+        background-color: #FAFAFA;
+        font-family: 'Outfit', sans-serif;
     }
-
-    .main {
-        background-color: #ffffff;
+    
+    /* Üst Başlık Stili */
+    h1 {
+        color: #1A1A1A;
+        font-weight: 700;
+        letter-spacing: -1px;
     }
-
-    /* Apple Stil Metrik Kartları */
+    
+    /* Metrik Kartları (Görseldeki beyaz kutular gibi) */
     div[data-testid="stMetric"] {
-        background: rgba(255, 255, 255, 0.8);
-        border: 1px solid #d2d2d7;
-        border-radius: 22px;
-        padding: 25px;
-        transition: all 0.5s ease;
+        background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F5 100%);
+        border: 1px solid #FFE4E4;
+        border-radius: 20px;
+        padding: 20px;
+        box-shadow: 0 10px 25px rgba(255, 75, 75, 0.08);
+        transition: transform 0.3s ease;
     }
     div[data-testid="stMetric"]:hover {
-        box-shadow: 0 20px 40px rgba(0,0,0,0.04);
         transform: translateY(-5px);
+        box-shadow: 0 15px 35px rgba(255, 75, 75, 0.15);
     }
-
-    /* Sidebar - Apple Control Center stili */
-    section[data-testid="stSidebar"] {
-        background-color: #f5f5f7;
-        border-right: 1px solid #d2d2d7;
-    }
-
-    /* Mavi Apple Butonu */
-    .stButton>button {
-        background-color: #0071e3;
-        color: white;
-        border-radius: 980px;
-        padding: 12px 30px;
-        border: none;
+    div[data-testid="stMetricLabel"] {
+        font-size: 14px;
+        color: #888;
         font-weight: 500;
+    }
+    div[data-testid="stMetricValue"] {
+        font-size: 28px;
+        color: #FF4B4B; /* Canlı Kırmızı/Turuncu Ton */
+        font-weight: 700;
+    }
+
+    /* Sidebar Tasarımı */
+    section[data-testid="stSidebar"] {
+        background-color: #1E1E1E; /* Koyu Sidebar */
+    }
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] p, section[data-testid="stSidebar"] label {
+        color: #FFFFFF !important;
+    }
+    
+    /* Buton Tasarımı (Gradient) */
+    .stButton>button {
+        background: linear-gradient(90deg, #FF4B4B 0%, #FF9068 100%);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 15px 30px;
         font-size: 16px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
         width: 100%;
-        transition: all 0.3s cubic-bezier(0.25, 0.1, 0.25, 1);
+        transition: all 0.3s;
     }
     .stButton>button:hover {
-        background-color: #0077ed;
-        box-shadow: 0 8px 15px rgba(0,113,227,0.3);
+        box-shadow: 0 10px 20px rgba(255, 75, 75, 0.4);
+        transform: scale(1.02);
     }
 
-    /* Tablo Tasarımı */
+    /* Tablo Düzeni */
     .stDataFrame {
-        border-radius: 18px;
-        overflow: hidden;
-        border: 1px solid #d2d2d7;
+        border-radius: 15px;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        border: 1px solid #eee;
     }
 
-    /* Başlıklar */
-    h1 {
-        font-weight: 600;
-        letter-spacing: -0.05em;
-        color: #1d1d1f;
+    /* Bilgi Kutusu */
+    .info-box {
+        background-color: #FFF0F0;
+        border-left: 5px solid #FF4B4B;
+        padding: 20px;
+        border-radius: 10px;
+        margin-top: 20px;
+        color: #333;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- VERİ SETİ (İstediğin İsimler ve Gerçek Veriler Sabit Tutuldu) ---
+# --- VERİ SETİ (Aynı Kalan Veriler) ---
 def get_database():
     return {
         "Beauty & Güzellik": [
@@ -113,55 +134,72 @@ def get_database():
         ]
     }
 
-# --- APP LOGIC ---
-st.title(" Influencer AI")
-st.write("Analitik verilerle inovatif kampanya planlama.")
+# --- ANA UYGULAMA MANTIĞI ---
+st.title("🚀 Influencer AI | Optimizer")
+st.markdown("Veriye dayalı kampanya planlama asistanınız.")
 
+# --- SIDEBAR (Koyu Tema) ---
 with st.sidebar:
-    st.markdown("### Kampanya Ayarları")
-    niche = st.selectbox("Niş Seçimi", list(get_database().keys()))
+    st.header("🎯 Kampanya Parametreleri")
+    niche = st.selectbox("Kategori Seçimi", list(get_database().keys()))
     total_budget = st.number_input("Reklam Bütçesi (₺)", min_value=1000, value=150000)
-    product_value = st.number_input("Ürün Birim Değeri (₺)", min_value=1, value=2500)
+    product_price = st.number_input("Ürün Birim Fiyatı (₺)", min_value=1, value=1500)
     
     st.markdown("---")
-    calculate = st.button("HESAPLA")
+    calculate = st.button("ANALİZİ BAŞLAT")
+    
+    st.markdown("""
+    <div style='margin-top: 30px; font-size: 12px; color: #888;'>
+    Influencer AI © 2024<br>
+    Powered by Data Analytics
+    </div>
+    """, unsafe_allow_html=True)
 
 if calculate:
     df = pd.DataFrame(get_database()[niche])
     
-    # HESAPLAMALAR (Senin İstediğin Formüller Sabit)
+    # --- FORMÜLLER (Aynen Korundu) ---
+    # 1. Bütçe Dağılımı (Alignment'a göre)
     total_alignment = df['alignment'].sum()
     df['allocated_budget'] = (df['alignment'] / total_alignment) * total_budget
+    
+    # 2. Gösterim (Impressions) = (Cost / CPM) * 1000
     df['est_impressions'] = (df['allocated_budget'] / df['base_cpm']) * 1000
+    
+    # 3. Gelir (Revenue) = (RPM * Impressions) / 1000
     df['total_revenue'] = (df['base_rpm'] * df['est_impressions']) / 1000
+    
+    # 4. ROI = (Revenue - Cost) / Cost * 100
     df['roi_percentage'] = ((df['total_revenue'] - df['allocated_budget']) / df['allocated_budget']) * 100
 
-    # ÜST METRİKLER (Apple Stil Kartlar)
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Tahmini Toplam Ciro", f"₺{df['total_revenue'].sum():,.0f}")
-    m2.metric("Kampanya ROI", f"%{df['roi_percentage'].mean():.1f}")
-    m3.metric("Tahmini Gösterim", f"{int(df['est_impressions'].sum()):,}")
+    # --- ÜST METRİK KARTLARI ---
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🔥 Toplam Tahmini Ciro", f"₺{df['total_revenue'].sum():,.0f}")
+    col2.metric("📈 Ortalama ROI", f"%{df['roi_percentage'].mean():.1f}")
+    col3.metric("👀 Toplam Gösterim", f"{int(df['est_impressions'].sum()):,}")
 
-    st.markdown("---")
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # GRAFİKLER
+    # --- GRAFİKLER ---
     c1, c2 = st.columns(2)
     with c1:
-        fig_pie = px.pie(df, values='allocated_budget', names='username', hole=0.7, 
-                         title="Bütçe Dağılım Payı", 
-                         color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig_pie.update_layout(showlegend=False, margin=dict(t=40, b=0, l=0, r=0))
+        # Pie Chart - Renkli ve Modern
+        fig_pie = px.pie(df, values='allocated_budget', names='username', hole=0.6, 
+                         title="Bütçe Dağılımı",
+                         color_discrete_sequence=px.colors.sequential.RdBu)
+        fig_pie.update_layout(showlegend=False)
         st.plotly_chart(fig_pie, use_container_width=True)
     
     with c2:
+        # Bar Chart - ROI
         fig_bar = px.bar(df, x='username', y='roi_percentage', 
-                         title="Influencer Bazlı ROI (%)",
-                         color_discrete_sequence=['#0071e3'])
-        fig_bar.update_layout(xaxis_title="", yaxis_title="", plot_bgcolor="rgba(0,0,0,0)")
+                         title="Yüzdesel ROI Geri Dönüşü",
+                         color='roi_percentage',
+                         color_continuous_scale='Reds')
         st.plotly_chart(fig_bar, use_container_width=True)
 
-    # DETAYLI TABLO
-    st.markdown("### 📊 Detaylı Analiz")
+    # --- DETAYLI TABLO ---
+    st.subheader("📋 Detaylı Analiz Raporu")
     st.dataframe(df[['username', 'alignment', 'allocated_budget', 'est_impressions', 'total_revenue', 'roi_percentage']].style.format({
         'allocated_budget': '₺{:.2f}',
         'total_revenue': '₺{:.2f}',
@@ -169,17 +207,19 @@ if calculate:
         'est_impressions': '{:,.0f}'
     }), use_container_width=True)
 
-    # HESAPLAMA ŞEFFAFLIĞI (Apple Stil Bilgi Paneli)
+    # --- METODOLOJİ (Bilgi Kutusu) ---
     st.markdown(f"""
-    <div style="background-color: #f5f5f7; padding: 25px; border-radius: 20px; border: 1px solid #d2d2d7;">
-    <h4 style="margin-top:0; color: #1d1d1f;"> Algoritma Metodolojisi</h4>
-    <p style="color: #86868b; font-size: 14px;">
-    Bu rapor, <b>CPM = (Maliyet / Gösterim) x 1,000</b>, <b>RPM = (Gelir / Gösterim) x 1,000</b> ve 
-    <b>ROI = (Kar / Maliyet) x 100</b> formülleriyle hesaplanmıştır. 
-    Bütçe dağılımı, influencer'ların <i>Brand Alignment</i> skorlarına göre optimize edilerek en yüksek verimlilik hedeflenmiştir.
-    </p>
+    <div class="info-box">
+        <h4>💡 Hesaplama Algoritması</h4>
+        <ul>
+            <li><b>CPM (Cost Per Mille):</b> (Maliyet / Gösterim) x 1,000 formülü baz alınmıştır.</li>
+            <li><b>RPM (Revenue Per Mille):</b> (Gelir / Gösterim) x 1,000 formülü ile ciro hesaplanır.</li>
+            <li><b>ROI (Return on Investment):</b> (Kar / Maliyet) x 100 formülü ile yatırım geri dönüş oranı bulunur.</li>
+            <li><b>Bütçe Dağılımı:</b> Influencer'ın markaya uyum skoru (Alignment) oranında bütçeden pay almasını sağlar.</li>
+        </ul>
     </div>
     """, unsafe_allow_html=True)
 
 else:
-    st.info("Devam etmek için kampanya detaylarını girin ve hesapla butonuna basın.")
+    # Boş Durum (Empty State)
+    st.info("👈 Lütfen sol menüden kampanya detaylarını girin ve analizi başlatın.")
