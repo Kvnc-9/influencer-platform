@@ -124,7 +124,7 @@ with col_input3:
 st.markdown("---")
 
 # MANUEL TIKLANMA GİRİŞİ (DATA EDITOR)
-st.subheader("👇 Sadece Tıklanma Sayılarını (Manuel_Tiklanma) Düzenleyin")
+st.subheader("👇 Tıklanma Sayılarını Manuel Giriniz.")
 
 # Veriyi session state'e kaydet
 if 'df_data_dark' not in st.session_state or st.session_state.get('current_niche_dark') != niche:
