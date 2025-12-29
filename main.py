@@ -1,185 +1,87 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from supabase import create_client, Client
 import time
 
-# --- 1. SAYFA KONFİGÜRASYONU ---
-st.set_page_config(page_title="Influencer ROI Master", layout="wide", initial_sidebar_state="expanded")
+# --- SAYFA AYARLARI ---
+st.set_page_config(page_title="Influencer ROI Master", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. SUPABASE BAĞLANTISI ---
-# Hata almamak için try-except bloğu
-try:
-    url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_KEY"]
-    supabase: Client = create_client(url, key)
-except Exception as e:
-    st.error("Supabase bağlantı hatası! Lütfen secrets.toml dosyanızı kontrol edin.")
-    st.stop()
+# --- SESSION STATE (OTURUM DURUMU) ---
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
 
-# --- 3. CSS TASARIMI (DARK & ORANGE) ---
+# --- CSS TASARIMI (DARK & ORANGE) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700;900&display=swap');
     
-    /* Genel Ayarlar */
-    .stApp {
-        background-color: #0E1117;
-        font-family: 'Roboto', sans-serif;
-    }
-    h1, h2, h3, h4, p, span, div, label {
-        color: #FFFFFF !important;
-    }
+    .stApp { background-color: #0E1117; font-family: 'Roboto', sans-serif; }
+    h1, h2, h3, h4, p, span, div, label { color: #FFFFFF !important; }
     
-    /* LANDING PAGE STİLLERİ */
+    /* LANDING PAGE */
     .hero-container {
-        text-align: center;
-        padding: 60px 20px;
-        border-radius: 20px;
-        background: linear-gradient(180deg, rgba(255, 109, 0, 0.1) 0%, rgba(14, 17, 23, 0) 100%);
-        border: 1px solid rgba(255, 109, 0, 0.2);
-        margin-bottom: 30px;
+        text-align: center; padding: 80px 20px;
+        background: radial-gradient(circle, rgba(255,109,0,0.15) 0%, rgba(14,17,23,0) 70%);
+        border-bottom: 1px solid #333; margin-bottom: 40px;
     }
     .hero-title {
-        font-size: 64px;
-        font-weight: 900;
+        font-size: 72px; font-weight: 900;
         background: -webkit-linear-gradient(#FF9E80, #FF6D00);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-bottom: 20px;
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
-    .hero-subtitle {
-        font-size: 24px;
-        color: #B0B0B0 !important;
-        font-weight: 300;
-        margin-bottom: 40px;
-    }
-    .feature-card {
-        background-color: #1E1E1E;
-        padding: 30px;
-        border-radius: 15px;
-        border: 1px solid #333;
-        text-align: center;
-        transition: transform 0.3s;
-    }
-    .feature-card:hover {
-        transform: translateY(-10px);
-        border-color: #FF6D00;
+    .hero-subtitle { font-size: 24px; color: #B0B0B0 !important; font-weight: 300; }
+    
+    /* LOGIN KUTUSU */
+    .login-box {
+        background-color: #1E1E1E; padding: 30px; border-radius: 15px;
+        border: 1px solid #FF6D00; max-width: 400px; margin: 0 auto;
     }
     
-    /* APP STİLLERİ (Önceki Koddan) */
-    div[data-testid="stMetric"] {
-        background-color: #1E1E1E;
-        border: 1px solid #FF6D00;
-        border-radius: 12px;
-    }
+    /* APP STİLLERİ */
+    div[data-testid="stMetric"] { background-color: #1E1E1E; border: 1px solid #FF6D00; border-radius: 12px; }
     div[data-testid="stMetricLabel"] { color: #FF9E80 !important; }
     div[data-testid="stMetricValue"] { color: #FFFFFF !important; }
     .stButton>button {
         background: linear-gradient(90deg, #FF6D00 0%, #FF9100 100%);
-        color: white !important;
-        border: none;
-        border-radius: 8px;
-        font-weight: bold;
-        transition: 0.3s;
+        color: white !important; border: none; border-radius: 8px; font-weight: bold;
     }
-    .stButton>button:hover { opacity: 0.9; transform: scale(1.02); }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 4. OTURUM YÖNETİMİ (SESSION STATE) ---
-if 'user' not in st.session_state:
-    st.session_state.user = None
+# --- FONKSİYONLAR ---
 
-# --- 5. FONKSİYONLAR ---
-
-def login_signup_ui():
-    """Sidebar'daki Giriş/Kayıt Paneli"""
-    st.sidebar.title("🍊 Giriş Yap")
+def login_function():
+    """Giriş Kontrolü (Basit Simülasyon)"""
+    st.markdown("<div class='hero-container'><h1 class='hero-title'>Influencer ROI Master</h1><p class='hero-subtitle'>Gelişmiş Analitik Platformu</p></div>", unsafe_allow_html=True)
     
-    choice = st.sidebar.radio("İşlem Seçin", ["Giriş Yap", "Kayıt Ol"])
-    email = st.sidebar.text_input("E-Posta Adresi")
-    password = st.sidebar.text_input("Şifre", type="password")
-
-    if choice == "Giriş Yap":
-        if st.sidebar.button("Giriş Yap", use_container_width=True):
-            try:
-                # Supabase Login
-                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                st.session_state.user = res.user
-                st.success("Giriş Başarılı!")
-                st.rerun()
-            except Exception as e:
-                st.sidebar.error(f"Giriş Hatası: {e}")
-                
-    elif choice == "Kayıt Ol":
-        if st.sidebar.button("Hesap Oluştur", use_container_width=True):
-            try:
-                # Supabase Signup
-                res = supabase.auth.sign_up({"email": email, "password": password})
-                st.sidebar.success("Kayıt başarılı! Lütfen e-postanızı onaylayın veya giriş yapın.")
-            except Exception as e:
-                st.sidebar.error(f"Kayıt Hatası: {e}")
-
-def logout():
-    """Çıkış Yapma Fonksiyonu"""
-    supabase.auth.sign_out()
-    st.session_state.user = None
-    st.rerun()
-
-def show_landing_page():
-    """Açılış Sayfası Tasarımı"""
-    # Hero Section
-    st.markdown("""
-        <div class="hero-container">
-            <h1 class="hero-title">Influencer ROI Master</h1>
-            <p class="hero-subtitle">Bütçenizi boşa harcamayın. Veriye dayalı influencer pazarlama ile maksimum kar elde edin.</p>
-        </div>
-    """, unsafe_allow_html=True)
-
-    # Özellikler Grid'i
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        <div class="feature-card">
-            <h3>📊 Akıllı Analiz</h3>
-            <p style="color:#aaa !important;">CPM, RPM ve ROI hesaplamalarını otomatik yapın.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
+    col1, col2, col3 = st.columns([1,1,1])
     with col2:
-        st.markdown("""
-        <div class="feature-card">
-            <h3>🎯 Hedef Odaklı</h3>
-            <p style="color:#aaa !important;">Marka uyumu (Alignment) skoruna göre en doğru kişiyi bulun.</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.info("Deneme için -> Kullanıcı: admin | Şifre: 1234")
+        user_input = st.text_input("Kullanıcı Adı")
+        pass_input = st.text_input("Şifre", type="password")
         
-    with col3:
-        st.markdown("""
-        <div class="feature-card">
-            <h3>🍊 Dark & Modern</h3>
-            <p style="color:#aaa !important;">Göz yormayan, kullanıcı dostu ve hızlı arayüz.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("<br><br><h3 style='text-align:center; color:#FF6D00 !important;'>Başlamak için soldaki menüden giriş yapın 👈</h3>", unsafe_allow_html=True)
+        if st.button("Giriş Yap", use_container_width=True):
+            if user_input == "admin" and pass_input == "1234":
+                st.session_state.logged_in = True
+                st.success("Giriş Başarılı!")
+                time.sleep(0.5)
+                st.rerun()
+            else:
+                st.error("Hatalı kullanıcı adı veya şifre!")
 
 def main_app():
-    """Ana Hesaplama Uygulaması (Önceki Kod)"""
+    """Ana Hesaplama Uygulaması"""
     
-    # Çıkış Butonu (Sidebar Altı)
-    st.sidebar.markdown("---")
-    st.sidebar.write(f"Kullanıcı: {st.session_state.user.email}")
-    if st.sidebar.button("Çıkış Yap"):
-        logout()
+    # Çıkış Butonu
+    with st.sidebar:
+        st.write("👤 **Admin**")
+        if st.button("Çıkış Yap"):
+            st.session_state.logged_in = False
+            st.rerun()
 
-    # --- UYGULAMA BAŞLANGICI ---
-    st.title("🍊 Influencer ROI Master (Pro Panel)")
-    st.write("Hoşgeldiniz. Lütfen kampanya verilerinizi girin.")
-
-    # VERİ SETİ
+    st.title("🍊 Hesaplama Paneli")
+    
+    # --- VERİ SETİ ---
     def get_initial_data():
         return {
             "Beauty & Güzellik": [
@@ -194,30 +96,7 @@ def main_app():
                 {"Influencer": "Damla Kalaycık", "Alignment": 88, "Avg_Views": 190000, "Manuel_Tiklanma": 400},
                 {"Influencer": "Ceren Ceyhun", "Alignment": 89, "Avg_Views": 40000, "Manuel_Tiklanma": 180},
             ],
-            "Teknoloji": [
-                {"Influencer": "Hakkı Alkan", "Alignment": 95, "Avg_Views": 450000, "Manuel_Tiklanma": 800},
-                {"Influencer": "Mesut Çevik", "Alignment": 98, "Avg_Views": 180000, "Manuel_Tiklanma": 400},
-                {"Influencer": "Barış Özcan", "Alignment": 90, "Avg_Views": 2500000, "Manuel_Tiklanma": 2500},
-                {"Influencer": "Can Değer", "Alignment": 99, "Avg_Views": 95000, "Manuel_Tiklanma": 300},
-                {"Influencer": "Enis Kirazoğlu", "Alignment": 85, "Avg_Views": 850000, "Manuel_Tiklanma": 1500},
-                {"Influencer": "Webtekno", "Alignment": 80, "Avg_Views": 700000, "Manuel_Tiklanma": 1800},
-                {"Influencer": "iPhonedo", "Alignment": 94, "Avg_Views": 350000, "Manuel_Tiklanma": 600},
-                {"Influencer": "ShiftDelete", "Alignment": 82, "Avg_Views": 600000, "Manuel_Tiklanma": 1000},
-                {"Influencer": "Donanım Arşivi", "Alignment": 92, "Avg_Views": 400000, "Manuel_Tiklanma": 750},
-                {"Influencer": "Technopat", "Alignment": 96, "Avg_Views": 150000, "Manuel_Tiklanma": 350},
-            ],
-            "Wellness & Spor": [
-                {"Influencer": "Ece Vahapoğlu", "Alignment": 98, "Avg_Views": 85000, "Manuel_Tiklanma": 200},
-                {"Influencer": "Elvin Levinler", "Alignment": 92, "Avg_Views": 420000, "Manuel_Tiklanma": 600},
-                {"Influencer": "Tuğçe İnce", "Alignment": 94, "Avg_Views": 55000, "Manuel_Tiklanma": 150},
-                {"Influencer": "Cansu Yeğin", "Alignment": 90, "Avg_Views": 70000, "Manuel_Tiklanma": 180},
-                {"Influencer": "Dilara Koçak", "Alignment": 100, "Avg_Views": 110000, "Manuel_Tiklanma": 400},
-                {"Influencer": "Ebru Şallı", "Alignment": 85, "Avg_Views": 380000, "Manuel_Tiklanma": 900},
-                {"Influencer": "Çetin Çetintaş", "Alignment": 97, "Avg_Views": 190000, "Manuel_Tiklanma": 350},
-                {"Influencer": "Murat Bür", "Alignment": 88, "Avg_Views": 45000, "Manuel_Tiklanma": 120},
-                {"Influencer": "Aysun Bekcan", "Alignment": 91, "Avg_Views": 35000, "Manuel_Tiklanma": 100},
-                {"Influencer": "Polat Özdemir", "Alignment": 89, "Avg_Views": 28000, "Manuel_Tiklanma": 110},
-            ]
+            # Diğer kategoriler buraya eklenebilir...
         }
 
     # GİRİŞ ALANI
@@ -287,12 +166,8 @@ def main_app():
             'Avg_Views': '{:,.0f}', 'Maliyet': '₺{:,.2f}', 'CPM': '₺{:,.2f}', 'Gelir': '₺{:,.2f}', 'RPM': '₺{:,.2f}', 'ROI (%)': '%{:.2f}'
         }), use_container_width=True)
 
-# --- 6. ANA KONTROL BLOKU ---
-
-if st.session_state.user:
-    # KULLANICI GİRİŞ YAPMIŞSA -> ANA UYGULAMAYI GÖSTER
+# --- 2. SAYFA KONTROLÜ ---
+if st.session_state.logged_in:
     main_app()
 else:
-    # KULLANICI GİRİŞ YAPMAMIŞSA -> LANDING PAGE + LOGIN SIDEBAR
-    login_signup_ui()
-    show_landing_page()
+    login_function()
