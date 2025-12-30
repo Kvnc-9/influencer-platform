@@ -7,91 +7,76 @@ import time
 # --- 1. SAYFA VE GENEL AYARLAR ---
 st.set_page_config(page_title="Influencer ROI Master", layout="wide", initial_sidebar_state="collapsed")
 
-# --- CSS TASARIMI (GÜÇLENDİRİLMİŞ GÖRÜNÜRLÜK) ---
+# --- 2. CSS TASARIMI (GÖRÜNÜRLÜK GARANTİLİ) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap');
     
+    /* Genel Reset */
     .stApp { background-color: #0E1117; font-family: 'Inter', sans-serif; }
     h1, h2, h3, h4, p, span, div, label, li { color: #FFFFFF !important; }
     
-    /* HERO SECTION */
-    .hero-container {
+    /* --- LANDING PAGE STİLLERİ --- */
+    .landing-wrapper {
+        width: 100%;
+        display: block;
+        color: white;
+    }
+    
+    /* HERO BÖLÜMÜ */
+    .hero-section {
         text-align: center;
-        padding: 80px 20px 40px 20px;
-        background: radial-gradient(circle at center, rgba(255, 109, 0, 0.15) 0%, rgba(14, 17, 23, 0) 60%);
+        padding: 80px 20px;
+        background: radial-gradient(circle at center, rgba(255, 109, 0, 0.15) 0%, rgba(14, 17, 23, 0) 70%);
         border-bottom: 1px solid #333;
-        margin-bottom: 20px;
     }
     .hero-title {
-        font-size: 72px; font-weight: 800; letter-spacing: -2px;
-        background: linear-gradient(135deg, #FFFFFF 0%, #FF9E80 100%);
-        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-        margin-bottom: 10px;
+        font-size: 80px; font-weight: 900; letter-spacing: -2px; margin-bottom: 20px;
+        background: -webkit-linear-gradient(#fff, #FF9E80); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
+    .hero-sub { font-size: 22px; color: #aaa !important; max-width: 800px; margin: 0 auto; line-height: 1.5; }
     
-    /* ÖZELLİK KARTLARI */
-    .feature-grid { display: flex; justify-content: center; gap: 20px; margin: 40px 0; flex-wrap: wrap; }
-    .feature-card {
-        background: #161B22; border: 1px solid #30363D; padding: 30px; border-radius: 16px;
-        width: 300px; text-align: left; transition: transform 0.3s;
+    /* ÖZELLİKLER */
+    .features-section {
+        display: flex; justify-content: center; gap: 30px; padding: 60px 20px; flex-wrap: wrap;
     }
-    .feature-card:hover { transform: translateY(-5px); border-color: #FF6D00; }
+    .feature-box {
+        background: #161B22; border: 1px solid #30363D; padding: 30px; border-radius: 16px; width: 300px;
+        transition: transform 0.3s;
+    }
+    .feature-box:hover { transform: translateY(-5px); border-color: #FF6D00; }
     
-    /* --- DÜZELTİLEN YORUMLAR (TESTIMONIALS) KISMI --- */
-    .testimonial-wrapper {
-        margin-top: 50px;
-        padding: 60px 20px;
-        background-color: #0d1117; /* Arka plan rengi */
+    /* --- YORUMLAR (SOSYAL KANIT) --- */
+    .testimonials-section {
+        background-color: #0d1117; /* Koyu zemin */
+        padding: 80px 20px;
+        margin-top: 40px;
         border-top: 1px solid #30363d;
         text-align: center;
-        display: block !important; /* Görünürlüğü zorla */
     }
-    .testimonial-grid {
-        display: flex;
-        justify-content: center;
-        gap: 30px;
-        flex-wrap: wrap;
-        margin-top: 40px;
+    .reviews-grid {
+        display: flex; justify-content: center; gap: 30px; margin-top: 40px; flex-wrap: wrap;
     }
     .review-card {
-        background: #161b22;
-        padding: 30px;
-        border-radius: 16px;
-        width: 300px;
-        border: 1px solid #30363d;
-        text-align: left;
-        position: relative;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        background: linear-gradient(145deg, #1f2428, #161b22);
+        padding: 30px; border-radius: 12px; width: 320px; text-align: left;
+        border: 1px solid #30363d; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
-    .review-card::before {
-        content: '"';
-        position: absolute;
-        top: 10px;
-        right: 20px;
-        font-size: 60px;
-        color: #21262d;
-        font-family: serif;
-    }
-    .stars { color: #FFD700 !important; margin-bottom: 15px; font-size: 18px; }
-    .review-text { font-size: 15px; line-height: 1.6; color: #c9d1d9 !important; font-style: italic; }
-    .client-info { margin-top: 20px; display: flex; align-items: center; gap: 10px; }
-    .client-avatar { width: 40px; height: 40px; background: #FF6D00; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white !important; }
+    .stars { color: #FFD700 !important; font-size: 20px; margin-bottom: 15px; }
+    .review-text { color: #c9d1d9 !important; font-style: italic; font-size: 15px; line-height: 1.6; }
+    .client-box { margin-top: 20px; display: flex; align-items: center; gap: 15px; }
+    .avatar { width: 45px; height: 45px; background: #FF6D00; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
     
-    /* APP İÇİ STİLLER */
-    div[data-testid="stMetric"] { background-color: #161B22; border: 1px solid #FF6D00; border-radius: 12px; padding: 15px; }
-    div[data-testid="stMetricLabel"] { color: #FF9E80 !important; font-size: 14px; }
-    div[data-testid="stMetricValue"] { color: #FFFFFF !important; font-size: 28px; font-weight: 700; }
+    /* APP İÇİ ELEMENTLER */
+    div[data-testid="stMetric"] { background-color: #161B22; border: 1px solid #FF6D00; border-radius: 12px; }
     .stButton>button {
-        background: linear-gradient(92deg, #FF6D00 0%, #FF3D00 100%);
-        color: white !important; border: none; border-radius: 8px; font-weight: 600;
-        padding: 0.75rem 1.5rem; transition: all 0.3s;
+        background: linear-gradient(90deg, #FF6D00 0%, #FF3D00 100%);
+        color: white !important; border: none; border-radius: 8px; font-weight: bold; padding: 0.8rem;
     }
-    .stButton>button:hover { box-shadow: 0 0 15px rgba(255, 109, 0, 0.5); transform: scale(1.02); }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. SUPABASE / AUTH ---
+# --- 3. SUPABASE BAĞLANTISI ---
 if 'user' not in st.session_state:
     st.session_state.user = None
 
@@ -102,91 +87,91 @@ try:
 except:
     pass
 
-# --- 3. LANDING PAGE PARÇALARI ---
-
-def show_hero_section():
-    """Üst Kısım: Başlık ve Özellikler"""
+# --- 4. TEK PARÇA LANDING PAGE HTML ---
+def render_full_landing_page():
+    # Bu HTML bloğu tek parça render edilir, böylece kopukluk olmaz.
     st.markdown("""
-        <div class="hero-container">
-            <span style="background-color:rgba(255,109,0,0.1); color:#FF6D00 !important; padding:5px 15px; border-radius:20px; font-size:12px; font-weight:bold; border:1px solid rgba(255,109,0,0.3);">YENİ NESİL ANALİTİK</span>
+    <div class="landing-wrapper">
+        
+        <div class="hero-section">
+            <span style="color:#FF6D00; font-weight:bold; border:1px solid #FF6D00; padding:5px 15px; border-radius:20px; font-size:12px;">YENİ NESİL ANALİTİK V2.0</span>
             <h1 class="hero-title">Influencer ROI Master</h1>
-            <p style="font-size: 20px; color: #8b949e !important; max-width: 700px; margin: 0 auto; line-height: 1.6;">
-                Milyonluk reklam bütçelerinizi şansa bırakmayın. 
-                <span style="color:#FF6D00 !important; font-weight:bold;">Yapay zeka destekli</span> algoritmamız ile en yüksek dönüşümü sağlayan influencerları saniyeler içinde tespit edin.
+            <p class="hero-sub">
+                Reklam bütçenizi körlemesine harcamayın. Yapay zeka ile 
+                <span style="color:#FF6D00; font-weight:bold;">gerçek veriyi</span> analiz edin, 
+                en karlı influencerları bulun.
             </p>
         </div>
 
-        <div class="feature-grid">
-            <div class="feature-card">
-                <h3 style="margin-bottom:10px;">⚡ Otomatik Hesaplama</h3>
-                <p style="font-size:14px; color:#8b949e !important;">CPM, RPM ve ROI metriklerini karmaşık Excel tablolarıyla uğraşmadan, anlık veriyle hesaplayın.</p>
+        <div class="features-section">
+            <div class="feature-box">
+                <h3>⚡ Otomatik Hesaplama</h3>
+                <p style="color:#8b949e !important;">CPM, RPM ve ROI metriklerini anlık veriyle, hatasız hesaplayın.</p>
             </div>
-            <div class="feature-card">
-                <h3 style="margin-bottom:10px;">🎯 Hedef Kitle Uyumu</h3>
-                <p style="font-size:14px; color:#8b949e !important;">Markanızın 'Brand Alignment' skoruna göre bütçenizi en doğru kişiye otomatik dağıtın.</p>
+            <div class="feature-box">
+                <h3>🎯 Hedef Kitle Uyumu</h3>
+                <p style="color:#8b949e !important;">Marka uyum skoruna (Alignment) göre bütçeyi en doğru kişiye aktarın.</p>
             </div>
-            <div class="feature-card">
-                <h3 style="margin-bottom:10px;">💎 Kurumsal Raporlama</h3>
-                <p style="font-size:14px; color:#8b949e !important;">Yöneticilerinize sunabileceğiniz, Apple tasarım dilinde şık ve anlaşılır grafikler.</p>
+            <div class="feature-box">
+                <h3>💎 Kurumsal Raporlama</h3>
+                <p style="color:#8b949e !important;">Apple tasarım dilinde, yöneticilerinize sunabileceğiniz şık grafikler.</p>
             </div>
         </div>
-    """, unsafe_allow_html=True)
 
-def show_testimonials():
-    """Alt Kısım: Yorumlar (Ayrı fonksiyon olarak çağırıyoruz ki kesin gözüksün)"""
-    st.markdown("""
-        <div class="testimonial-wrapper">
-            <h2 style="font-size:32px; font-weight:800; margin-bottom:10px;">Sektör Liderleri Bize Güveniyor</h2>
-            <p style="color:#8b949e !important; font-size:16px;">500+ Marka ROI Master ile bütçesini yönetiyor.</p>
+        <div class="testimonials-section">
+            <h2 style="font-size:36px; font-weight:800; margin-bottom:10px;">Sektör Liderleri Bize Güveniyor</h2>
+            <p style="color:#8b949e !important;">Türkiye'nin en büyük 500+ markası bütçesini bizimle yönetiyor.</p>
             
-            <div class="testimonial-grid">
+            <div class="reviews-grid">
                 <div class="review-card">
                     <div class="stars">★★★★★</div>
-                    <p class="review-text">"Influencer pazarlamasında kör atış yapmayı bıraktık. Artık hangi kuruşun nereye gittiğini ve ne kadar getirdiğini net görüyoruz. ROI oranımız %40 arttı."</p>
-                    <div class="client-info">
-                        <div class="client-avatar">SY</div>
+                    <p class="review-text">"Eskiden influencer seçerken hislerimizle hareket ediyorduk. ROI Master ile artık matematiğe güveniyoruz. Dönüşüm oranımız %40 arttı."</p>
+                    <div class="client-box">
+                        <div class="avatar">SY</div>
                         <div>
-                            <div style="font-weight:bold; font-size:14px; color:white !important;">Selin Yılmaz</div>
+                            <div style="font-weight:bold; font-size:14px;">Selin Yılmaz</div>
                             <div style="font-size:12px; color:#8b949e !important;">CMO, TechMedia A.Ş.</div>
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="review-card">
                     <div class="stars">★★★★★</div>
-                    <p class="review-text">"Arayüz o kadar temiz ve hızlı ki, tüm ekibimiz 10 dakikada adapte oldu. Hesaplamaların doğruluğu ve şeffaflığı harika. Kesinlikle tavsiye ederim."</p>
-                    <div class="client-info">
-                        <div class="client-avatar">MD</div>
+                    <p class="review-text">"Arayüz o kadar temiz ve hızlı ki, tüm pazarlama ekibimiz 10 dakikada adapte oldu. Hesaplamaların doğruluğu harika."</p>
+                    <div class="client-box">
+                        <div class="avatar">MD</div>
                         <div>
-                            <div style="font-weight:bold; font-size:14px; color:white !important;">Mert Demir</div>
+                            <div style="font-weight:bold; font-size:14px;">Mert Demir</div>
                             <div style="font-size:12px; color:#8b949e !important;">CEO, GlowCosmetics</div>
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="review-card">
                     <div class="stars">★★★★★</div>
-                    <p class="review-text">"CPM ve RPM hesaplamaları manuel yaparken çok hata yapıyorduk. Bu platform işimizi inanılmaz kolaylaştırdı. Apple kalitesinde bir deneyim."</p>
-                    <div class="client-info">
-                        <div class="client-avatar">AK</div>
+                    <p class="review-text">"Manuel CPM hesaplarken yaptığımız hatalar bize binlerce liraya mal oluyordu. Bu platform işimizi inanılmaz kolaylaştırdı."</p>
+                    <div class="client-box">
+                        <div class="avatar">AK</div>
                         <div>
-                            <div style="font-weight:bold; font-size:14px; color:white !important;">Ayşe Kaya</div>
+                            <div style="font-weight:bold; font-size:14px;">Ayşe Kaya</div>
                             <div style="font-size:12px; color:#8b949e !important;">Growth Lead, FitLife App</div>
                         </div>
                     </div>
                 </div>
             </div>
             
-            <div style="margin-top:60px; color:#484f58 !important; font-size:12px;">
+            <div style="margin-top:50px; color:#484f58 !important; font-size:12px;">
                 © 2025 Influencer ROI Master Inc. Tüm hakları saklıdır.
             </div>
         </div>
+
+    </div>
     """, unsafe_allow_html=True)
 
-# --- 4. GİRİŞ FORMU ---
-def login_sidebar():
+# --- 5. GİRİŞ PANELİ (SIDEBAR) ---
+def render_login_sidebar():
     st.sidebar.markdown("## 🍊 Giriş Paneli")
-    st.sidebar.info("Giriş yaparak analizlere başlayın.")
+    st.sidebar.info("Panel erişimi için giriş yapın.")
     
     choice = st.sidebar.radio("İşlem", ["Giriş Yap", "Kayıt Ol"])
     email = st.sidebar.text_input("E-Posta")
@@ -201,24 +186,27 @@ def login_sidebar():
                 time.sleep(0.5)
                 st.rerun()
             except:
+                # Demo Fallback
                 if email == "admin" and password == "1234":
                     st.session_state.user = {"email": "admin@demo.com"}
                     st.rerun()
                 else:
-                    st.sidebar.error("Giriş yapılamadı.")
+                    st.sidebar.error("Hatalı giriş.")
                     
     elif choice == "Kayıt Ol":
         if st.sidebar.button("Hesap Oluştur", use_container_width=True):
             try:
-                res = supabase.auth.sign_up({"email": email, "password": password})
+                supabase.auth.sign_up({"email": email, "password": password})
                 st.sidebar.success("Kayıt Başarılı!")
             except Exception as e:
                 st.sidebar.error(f"Hata: {e}")
 
-# --- 5. ANA UYGULAMA ---
+# --- 6. ANA UYGULAMA (HESAPLAMA) ---
 def main_app():
+    # Çıkış Butonu
     with st.sidebar:
-        st.write(f"👤 **{st.session_state.user.email if hasattr(st.session_state.user, 'email') else 'Admin'}**")
+        user_email = st.session_state.user.email if hasattr(st.session_state.user, 'email') else 'Admin'
+        st.write(f"👤 **{user_email}**")
         if st.sidebar.button("Çıkış Yap"):
             if 'supabase' in globals(): supabase.auth.sign_out()
             st.session_state.user = None
@@ -233,8 +221,8 @@ def main_app():
 
     st.divider()
 
+    # Data
     def get_data(category):
-        # ... (Veriler öncekiyle aynı, kısaltıldı) ...
         data = {
             "Beauty & Güzellik": [{"Influencer": "Merve Özkaynak", "Alignment": 96, "Avg_Views": 550000, "Manuel_Tiklanma": 500}, {"Influencer": "Duygu Özaslan", "Alignment": 85, "Avg_Views": 380000, "Manuel_Tiklanma": 420}, {"Influencer": "Danla Bilic", "Alignment": 70, "Avg_Views": 1500000, "Manuel_Tiklanma": 1200}, {"Influencer": "Sebi Bebi", "Alignment": 92, "Avg_Views": 120000, "Manuel_Tiklanma": 300}, {"Influencer": "Görkem Karman", "Alignment": 94, "Avg_Views": 110000, "Manuel_Tiklanma": 350}, {"Influencer": "Polen Sarıca", "Alignment": 90, "Avg_Views": 65000, "Manuel_Tiklanma": 200}, {"Influencer": "Aslı Çıra", "Alignment": 91, "Avg_Views": 85000, "Manuel_Tiklanma": 210}, {"Influencer": "Ayşenur Yazıcı", "Alignment": 98, "Avg_Views": 45000, "Manuel_Tiklanma": 150}, {"Influencer": "Damla Kalaycık", "Alignment": 88, "Avg_Views": 190000, "Manuel_Tiklanma": 400}, {"Influencer": "Ceren Ceyhun", "Alignment": 89, "Avg_Views": 40000, "Manuel_Tiklanma": 180}],
             "Teknoloji": [{"Influencer": "Hakkı Alkan", "Alignment": 95, "Avg_Views": 450000, "Manuel_Tiklanma": 800}, {"Influencer": "Mesut Çevik", "Alignment": 98, "Avg_Views": 180000, "Manuel_Tiklanma": 400}, {"Influencer": "Barış Özcan", "Alignment": 90, "Avg_Views": 2500000, "Manuel_Tiklanma": 2500}, {"Influencer": "Can Değer", "Alignment": 99, "Avg_Views": 95000, "Manuel_Tiklanma": 300}, {"Influencer": "Enis Kirazoğlu", "Alignment": 85, "Avg_Views": 850000, "Manuel_Tiklanma": 1500}, {"Influencer": "Webtekno", "Alignment": 80, "Avg_Views": 700000, "Manuel_Tiklanma": 1800}, {"Influencer": "iPhonedo", "Alignment": 94, "Avg_Views": 350000, "Manuel_Tiklanma": 600}, {"Influencer": "ShiftDelete", "Alignment": 82, "Avg_Views": 600000, "Manuel_Tiklanma": 1000}, {"Influencer": "Donanım Arşivi", "Alignment": 92, "Avg_Views": 400000, "Manuel_Tiklanma": 750}, {"Influencer": "Technopat", "Alignment": 96, "Avg_Views": 150000, "Manuel_Tiklanma": 350}],
@@ -280,23 +268,33 @@ def main_app():
 
         g1, g2 = st.columns(2)
         with g1:
-            fig_pie = px.pie(df, values='Maliyet', names='Influencer', title='Bütçe Dağılımı', hole=0.4, color_discrete_sequence=px.colors.sequential.Oranges)
+            fig_pie = px.pie(df, values='Maliyet', names='Influencer', title='Bütçe Dağılımı (Maliyet)', 
+                             color_discrete_sequence=px.colors.sequential.Oranges, hole=0.4)
             fig_pie.update_layout(paper_bgcolor='#0E1117', plot_bgcolor='#0E1117', font=dict(color='white'))
             st.plotly_chart(fig_pie, use_container_width=True)
+            
         with g2:
-            fig_bar = px.bar(df, x='Influencer', y='ROI (%)', title='ROI Analizi', text_auto='.1f', color='ROI (%)', color_continuous_scale='Oranges')
-            fig_bar.update_layout(paper_bgcolor='#0E1117', plot_bgcolor='#0E1117', font=dict(color='white'), xaxis_title="", yaxis_title="ROI %")
+            fig_bar = px.bar(df, x='Influencer', y='ROI (%)', title='ROI Analizi', 
+                             text_auto='.1f', color='ROI (%)', color_continuous_scale='Oranges')
+            fig_bar.update_layout(paper_bgcolor='#0E1117', plot_bgcolor='#0E1117', font=dict(color='white'),
+                                  xaxis_title="", yaxis_title="ROI %")
             st.plotly_chart(fig_bar, use_container_width=True)
 
-        st.dataframe(df[['Influencer', 'Avg_Views', 'Maliyet', 'CPM', 'Gelir', 'RPM', 'ROI (%)']].style.format({
-            'Avg_Views': '{:,.0f}', 'Maliyet': '₺{:,.2f}', 'CPM': '₺{:,.2f}', 'Gelir': '₺{:,.2f}', 'RPM': '₺{:,.2f}', 'ROI (%)': '%{:.2f}'
-        }), use_container_width=True)
+        st.dataframe(
+            df[['Influencer', 'Avg_Views', 'Maliyet', 'CPM', 'Gelir', 'RPM', 'ROI (%)']].style.format({
+                'Avg_Views': '{:,.0f}',
+                'Maliyet': '₺{:,.2f}',
+                'CPM': '₺{:,.2f}',
+                'Gelir': '₺{:,.2f}',
+                'RPM': '₺{:,.2f}',
+                'ROI (%)': '%{:.2f}'
+            }),
+            use_container_width=True
+        )
 
-# --- 6. AKIŞ KONTROLÜ ---
+# --- 7. AKIŞ KONTROLÜ (KESİN) ---
 if st.session_state.user is not None:
     main_app()
 else:
-    login_sidebar()
-    # Hero ve Testimonials'ı ayrı çağırıyoruz ki kesin render olsun
-    show_hero_section()
-    show_testimonials()
+    render_login_sidebar()
+    render_full_landing_page() # Tek fonksiyon, tek blok
